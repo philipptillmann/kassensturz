@@ -1,0 +1,45 @@
+name: Server container
+on:
+  push:
+    branches: [server]
+  pull_request:
+    branches: [server]
+permissions:
+  contents: read
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_PASSWORD: ci-only-not-a-real-password
+      DOMAIN: kassensturz.example.com
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose configurations
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.https.yaml config --quiet
+      - name: Build image
+        run: docker build -t kassensturz:test .
+      - name: Test application and real receipt OCR inside container
+        run: >-
+          docker run --rm --read-only --tmpfs /tmp:size=256m
+          --cap-drop ALL --security-opt no-new-privileges
+          -e CHECK_CONTAINER=1 kassensturz:test
+          python -m unittest discover -s tests -v
+      - name: Start Compose and verify persistent multi-device access
+        run: |
+          docker compose up -d --wait
+          python3 tests/smoke_http.py http://127.0.0.1:8080
+          docker compose restart app
+          for i in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:8080/healthz && break
+            sleep 2
+          done
+          python3 tests/smoke_http.py http://127.0.0.1:8080 --verify-persistence
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop test containers
+        if: always()
+        run: docker compose down --volumes

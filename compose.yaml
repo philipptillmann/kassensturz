@@ -1,0 +1,24 @@
+name: kassensturz
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${PORT:-8080}:8080"
+    environment:
+      APP_PASSWORD: ${APP_PASSWORD:?Set APP_PASSWORD in .env (at least 12 characters)}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+    volumes:
+      - data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    mem_limit: 768m
+    pids_limit: 128
+volumes:
+  data:

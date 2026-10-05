@@ -1,51 +1,128 @@
-# Ausgabenbuch
+# Kassensturz — Server
 
-Eine lokale Ausgaben-App für macOS mit SQLite, CSV-Bankimport und Apple-Vision-Texterkennung. Keine Cloud, keine externen Webfonts, keine Python-Paketinstallation.
+Ausgaben, Kategorien und aufgeteilte Rechnungen in einer gemeinsamen Web-App. Laptop und Handy greifen auf dieselbe SQLite-Datenbank zu. Installation mit Docker Compose auf einem NAS, Heimserver, VPS oder Mac mit Docker Desktop.
 
-## Start auf dem Mac
+Der Branch `local` enthält weiterhin die ursprüngliche Mac-Version. Dieser Branch `server` verwendet Flask und Waitress sowie Tesseract statt Apple Vision. Alle angemeldeten Geräte teilen **ein Haushaltskonto**; es gibt keine getrennten Benutzer oder Berechtigungsstufen.
 
-Python 3.10 oder neuer erforderlich. `start.command` doppelklicken oder im Projektordner ausführen:
+## Installation im privaten Netzwerk
+
+Voraussetzung: Docker Engine mit Compose v2 oder Docker Desktop. Der Rechner mit Docker muss eingeschaltet bleiben.
 
 ```sh
-python3 app.py --open
+git clone --branch server https://github.com/philipptillmann/kassensturz.git
+cd kassensturz
+cp .env.example .env
 ```
 
-Die App läuft auf Port 8765. Der persönliche Verbindungslink steht im Terminal. Zum Beenden Ctrl+C drücken. Bei belegtem Port `--port 8766` ergänzen. Nach jedem Neustart den neuen Link verwenden.
+In `.env` ein eigenes, langes Passwort setzen (mindestens 12 Zeichen):
 
-## Rechnungen vom Handy
-
-```sh
-python3 app.py --lan --open
+```dotenv
+APP_PASSWORD='hier-ein-eigenes-langes-passwort-eintragen'
+PORT=8080
+BIND_ADDRESS=0.0.0.0
+PUBLIC_URL=
+DOMAIN=
 ```
 
-Mac und Handy müssen im gleichen privaten WLAN sein. Den im Terminal angezeigten Handy-Link auf dem Handy öffnen. Bei Bedarf den Netzwerkzugriff in der macOS-Firewall erlauben. Unter „Rechnung scannen“ kann die Kamera oder Fotomediathek ausgewählt werden; das Bild wird an den Mac übertragen und dort verarbeitet. Die App verwendet HTTP und sollte daher ausschließlich im vertrauenswürdigen privaten WLAN verwendet werden. Sie ist nicht für eine Freigabe ins Internet ausgelegt. Beim normalen Start bleibt der Server auf den Mac beschränkt.
-
-## Rechnungen und Kategorien
-
-1. Neue Ausgabe anlegen oder eine bestehende Kontobuchung anklicken.
-2. Foto auswählen. Apple Vision liest den Text lokal aus; dafür sind funktionierende Xcode Command Line Tools (`xcode-select --install`) erforderlich.
-3. Erkannte Positionen, Betrag, Datum und Händler prüfen. Kategorien pro Position auswählen. Positionen können jederzeit manuell erfasst werden.
-4. Versand, Rabatte oder weitere fehlende Positionen ergänzen. Positionssumme und Buchungsbetrag müssen exakt übereinstimmen.
-
-OCR erkennt Text und schlägt einfache Zeilen mit abschließenden Preisen vor. Es handelt sich nicht um eine semantische Rechnungserkennung: mehrspaltige Amazon-Rechnungen, Mengen, Steuern und Summenzeilen können Nacharbeit benötigen. Einfache Stichwortregeln schlagen Kategorien vor, etwa „Fahrradlicht“ → Fahrrad und „Kochtopf“ → Küche & Haushalt. Unbekannte Artikel bleiben unkategorisiert; alle Vorschläge sind manuell korrigierbar. Fotos werden nur temporär für OCR verarbeitet und danach gelöscht; es gibt noch kein Belegarchiv und keine PDF-Erkennung. Foto an einer bestehenden Buchung erfassen, um diese aufzuteilen, statt eine zweite Ausgabe anzulegen.
-
-## Bankimport
-
-Unter „Kategorien & Import“ eine CSV auswählen und Datum, Händler/Verwendungszweck sowie Betrag zuordnen. UTF-8 und Windows-1252 werden unterstützt. Bankformat bedeutet: negative Beträge werden zu positiven Ausgaben, positive Beträge zu Gutschriften. Die App unterstützt in dieser Version EUR. Vor dem Import Währung im Bankexport prüfen. Die Vorschau zeigt Originalwerte. Bei Fehlern wird der gesamte Import zurückgerollt.
-
-Identische Buchungen werden anhand Datum, Händler, Betrag und Vorkommensnummer erkannt. Das verhindert doppelte vollständige Importe und erhält mehrere identische Buchungen innerhalb derselben Datei. Bei überlappenden Teil-Exporten ohne stabile Bank-ID ist diese Heuristik nicht eindeutig; solche Exporte prüfen. Nach Import oben den passenden Monat wählen. Ausgaben und Gutschriften werden getrennt dargestellt; Kategorie-Balken zählen positive Positionen vor Erstattungen.
-
-`bank_providers.py` enthält das Protokoll für spätere Bankadapter und ein einheitliches Datenmodell. Noch keine Bank ist verbunden; Autorisierung, Abruf, Synchronisation und bankspezifische Umsetzung sind zu implementieren. Stabile externe IDs für Bankimporte nutzen und Zugangsdaten im macOS-Schlüsselbund speichern.
-
-## Speicherung und Backup
-
-Alle Buchungen und Kategorien liegen in `data/expenses.sqlite3`. Für ein vollständiges Backup die App beenden und diese Datei sichern. Zum Wiederherstellen bei beendeter App zurückkopieren. Der CSV-Export enthält aufgeteilte Positionen, ist aber kein vollständiges Backup und sollte nicht direkt wieder als Bankimport verwendet werden. Die Datenbank ist nicht separat verschlüsselt; Dateirechte begrenzen den Zugriff auf den macOS-Benutzer.
-
-## Prüfung
+Den Beispieltext durch ein echtes Passwort ersetzen. `.env` wird nicht in Git oder ins Docker-Image aufgenommen. Werte mit `$` oder `#` in einfache Anführungszeichen setzen.
 
 ```sh
-python3 -m unittest discover -s tests -v
+docker compose up -d --build
+docker compose ps
+```
+
+- Auf dem Docker-Rechner: `http://localhost:8080`
+- Auf Laptop und Handy im gleichen Netzwerk: `http://SERVER-IP:8080`, z. B. `http://192.168.1.50:8080`
+- Auf beiden Geräten mit demselben Passwort anmelden. Bei Bedarf Port 8080 in der Firewall für das private Netz erlauben.
+
+Das Handy benötigt keine eigene App. „Rechnung scannen“ öffnet die Fotoauswahl bzw. Kamera. Fotos werden zum Server übertragen, dort verarbeitet und danach gelöscht. Änderungen sind beim erneuten Öffnen der Seite bzw. Zurückkehren zum Browser-Tab sichtbar. Bei gleichzeitigem Bearbeiten derselben Buchung gilt die zuletzt gespeicherte Änderung.
+
+Die Standard-Konfiguration verwendet HTTP und ist für ein vertrauenswürdiges privates Netzwerk gedacht. Für Zugriff über das Internet die folgende HTTPS-Variante verwenden. Keine HTTP-Portfreigabe ins Internet einrichten.
+
+## HTTPS mit eigener Domain
+
+Die zusätzliche Compose-Datei enthält Caddy für automatische TLS-Zertifikate. Eine Domain muss auf den Server zeigen; TCP-Ports 80 und 443 müssen von außen erreichbar sein. Bei einem Heimserver sind dafür ggf. Router-Portweiterleitungen nötig.
+
+In `.env` das Passwort und die Domain setzen:
+
+```dotenv
+APP_PASSWORD='dein-eigenes-langes-passwort'
+DOMAIN=kassensturz.example.com
+```
+
+Dann **anstelle** der Standard-Konfiguration starten:
+
+```sh
+# Nur beim Wechsel von der HTTP-Installation: den bisherigen Stack anhalten.
+docker compose down
+docker compose -f compose.https.yaml up -d --build
+```
+
+Auf Laptop und Handy `https://kassensturz.example.com` öffnen. Diese Variante veröffentlicht ausschließlich den Reverse Proxy, nicht den App-Port. Beide Compose-Dateien nutzen denselben Projektnamen und dasselbe Daten-Volume. Bei weiteren Befehlen für die HTTPS-Variante immer `-f compose.https.yaml` ergänzen. Caddys Zertifikate liegen in eigenen persistenten Volumes.
+
+Bei einem bereits vorhandenen Reverse Proxy stattdessen in der Standard-Konfiguration `BIND_ADDRESS=127.0.0.1` und `PUBLIC_URL=https://deine-domain.example` setzen. Der Proxy muss den ursprünglichen `Host`-Header erhalten und auf Port 8080 weiterleiten. `PUBLIC_URL` ist eine einzelne Adresse ohne Pfad; danach über genau diese Adresse zugreifen. Secure-Cookies und HSTS werden bei einer HTTPS-Adresse aktiviert. Ungeprüfte Forwarded-Header werden nicht vertraut.
+
+## Funktionen
+
+- Monatsübersicht, Suche, eigene Kategorien und CSV-Export.
+- CSV-Bankimport mit frei zugeordneten Spalten, UTF-8/Windows-1252 sowie deutscher Betrags- und Datumsdarstellung. Aktuell nur EUR.
+- Eine Buchung lässt sich in einzelne Artikel mit verschiedenen Kategorien aufteilen. Die Positionssumme muss dem Buchungsbetrag entsprechen.
+- OCR auf dem Server mit Tesseract, Deutsch und Englisch. JPEG, PNG, WebP und HEIC; maximal 12 MB und 25 Megapixel. Automatische Ausrichtung anhand der EXIF-Daten.
+- Einfache Stichwortvorschläge für Kategorien. Erkannte Positionen und Beträge vor dem Speichern prüfen. Mehrspaltige Rechnungen benötigen ggf. manuelle Nacharbeit.
+- Eine OCR-Anfrage gleichzeitig; weitere Anfragen erhalten einen Hinweis zum erneuten Versuch. Verarbeitung endet nach maximal 60 Sekunden. Keine Cloud-OCR, kein dauerhaftes Fotoarchiv, keine PDF-Erkennung.
+
+Rechnungen für bereits importierte Umsätze **an der bestehenden Buchung** erfassen, um doppelte Ausgaben zu vermeiden. Bei CSV-Importen werden identische Buchungen anhand Datum, Händler, Betrag und Vorkommensnummer erkannt. Überlappende Teil-Exporte können ohne Bank-ID nicht immer eindeutig abgeglichen werden. Einnahmen werden als Gutschriften angezeigt; Kategorie-Auswertungen zählen positive Positionen vor Erstattungen.
+
+`bank_providers.py` enthält weiterhin die vorbereitete Bankadapter-Schnittstelle. Es ist noch keine Bank direkt angebunden.
+
+## Betrieb und Daten
+
+```sh
+docker compose logs --tail=100 app
+docker compose stop
+# Nach Code-Updates:
+git pull --ff-only
+docker compose up -d --build
+```
+
+Daten liegen im Docker-Volume `kassensturz_data` unter `/data/expenses.sqlite3`. Container laufen ohne Root-Rechte, mit schreibgeschütztem Dateisystem und separatem temporären Speicher. Container-Neustarts und neue Images behalten die Daten. **`docker compose down --volumes` löscht die Daten-Volumes**; im normalen Betrieb nur `down` ohne diese Option verwenden.
+
+Sitzungen gelten sieben Tage, überleben Neustarts und lassen sich pro Gerät abmelden. Eine Änderung von `APP_PASSWORD` mit anschließendem `docker compose up -d` macht alte Sitzungen ungültig. Alle Geräte müssen sich neu anmelden. Als Alternative zur Umgebungsvariable unterstützt der Server `APP_PASSWORD_FILE`, z. B. für eine gemountete Docker-Secret-Datei. Daten und Passwortkonfiguration sind nicht für andere Benutzer des Servers bestimmt; die Datenbank ist nicht zusätzlich verschlüsselt.
+
+### Konsistentes Backup im laufenden Betrieb
+
+SQLite-Backup verwenden, damit laufende Schreibvorgänge und WAL-Daten berücksichtigt werden:
+
+```sh
+docker compose exec -T app python -c "import sqlite3; s=sqlite3.connect('/data/expenses.sqlite3'); d=sqlite3.connect('/tmp/kassensturz-backup.sqlite3'); s.backup(d); d.close(); s.close()"
+docker compose cp app:/tmp/kassensturz-backup.sqlite3 ./kassensturz-backup.sqlite3
+```
+
+Das Backup außerhalb des Servers aufbewahren. Ein CSV-Export ersetzt kein vollständiges Backup.
+
+### Vorhandene lokale Daten übernehmen oder Backup wiederherstellen
+
+In einer **neuen Installation mit leerem Daten-Volume**, vor dem ersten Start:
+
+```sh
+docker compose run --rm --no-deps -T app python -c "import pathlib,sys; p=pathlib.Path('/data/expenses.sqlite3'); assert not p.exists(), 'Datenbank existiert bereits'; p.write_bytes(sys.stdin.buffer.read()); p.chmod(0o600)" < /pfad/zum/kassensturz-backup.sqlite3
+docker compose up -d --build
+```
+
+Vor dem Import muss das Image gebaut sein: `docker compose build`. Für Daten aus dem Branch `local` zuerst die lokale App beenden und deren `data/expenses.sqlite3` sichern. Bestehende Serverdaten nicht überschreiben: zur Wiederherstellung eine separate, leere Installation verwenden und nach der Prüfung umstellen. Die Session-Tabelle wird beim Start ergänzt; vorhandene Buchungen und Kategorien bleiben erhalten.
+
+## Entwicklung und Tests
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m unittest discover -s tests -v
 node --check static/app.js
+node --check static/login.js
 ```
 
-Die erste Version ist eine lokale Browser-App, kein signiertes natives macOS-App-Bundle. Automatische Kategorisierung, Belegarchiv, Bank-Synchronisierung und HTTPS-Handy-Pairing sind mögliche nächste Ausbaustufen.
+Ohne Docker kann die App mit `APP_PASSWORD='ein-langes-testpasswort' .venv/bin/python server.py` gestartet werden. Tesseract samt Sprachpaketen muss dafür separat installiert sein. Die `.env` wird ausschließlich durch Compose eingelesen.
+
+Die GitHub-Actions-Pipeline baut das Docker-Image und prüft Anmeldung, CSRF-Schutz, Sitzungsablauf, Passwortwechsel, zwei Geräte, Import, echte Tesseract-OCR, HEIC-Decodierung, Nicht-Root-Ausführung sowie Datenpersistenz nach einem Container-Neustart. Es wird kein Image in eine Registry veröffentlicht; `docker compose up --build` baut es auf dem Zielserver.
+
+Technische Referenzen: [Waitress-Konfiguration](https://docs.pylonsproject.org/projects/waitress/en/latest/arguments.html), [Pillow EXIF-Ausrichtung](https://pillow.readthedocs.io/en/stable/reference/ImageOps.html).

@@ -1,0 +1,11 @@
+*
+!Dockerfile
+!requirements.txt
+!app.py
+!server.py
+!receipts.py
+!bank_providers.py
+!static/
+!static/**
+!tests/
+!tests/*.py
