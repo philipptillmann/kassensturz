@@ -88,6 +88,8 @@ pre{white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;fo
 .login-icon{display:block;margin-bottom:20px}
 .login form{display:flex;flex-direction:column;gap:14px;margin-top:28px}
 .login input{width:100%}
+.login .remember{margin:2px 0 6px;font-size:14px;color:var(--ink)}
+.login .remember input{width:18px;height:18px;min-height:0;margin:0;accent-color:var(--accent)}
 @media(min-width:1500px){main{margin-right:auto}}
 @media(max-width:1000px){aside{width:205px;padding:28px 14px}.brand{font-size:17px;gap:8px}main{margin-left:205px;padding:32px 24px}.stats{gap:10px}.stat{padding:18px}.columns{grid-template-columns:1fr}}
 @media(max-width:760px){

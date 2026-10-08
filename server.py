@@ -20,6 +20,7 @@ from datasets import prepare_demo
 from receipts import OCRBusy
 
 SESSION_SECONDS = 7 * 24 * 3600
+REMEMBER_SECONDS = 90 * 24 * 3600
 MAX_BODY = 17_000_000
 
 
@@ -154,6 +155,10 @@ def create_app(password=None, public_url=None):
         data = request.get_json()
         if not isinstance(data, dict) or not isinstance(data.get('password'), str) or len(data['password']) > 1024:
             return failure('Bitte ein gültiges Passwort eingeben.')
+        remember = data.get('remember', False)
+        if not isinstance(remember, bool):
+            return failure('Ungültige Sitzungseinstellung.')
+        session_seconds = REMEMBER_SECONDS if remember else SESSION_SECONDS
         now = time.time()
         # A global limit protects the shared password even behind a reverse proxy.
         with login_lock:
@@ -174,9 +179,9 @@ def create_app(password=None, public_url=None):
             if old_token:
                 con.execute('DELETE FROM sessions WHERE token_hash=?', (hashlib.sha256(old_token.encode()).hexdigest(),))
             con.execute('INSERT INTO sessions VALUES (?,?,?,?)',
-                        (hashlib.sha256(token.encode()).hexdigest(), csrf, int(now) + SESSION_SECONDS, auth_version))
+                        (hashlib.sha256(token.encode()).hexdigest(), csrf, int(now) + session_seconds, auth_version))
         response = jsonify(csrf=csrf)
-        response.set_cookie('session', token, max_age=SESSION_SECONDS, httponly=True, secure=secure, samesite='Strict', path='/')
+        response.set_cookie('session', token, max_age=session_seconds, httponly=True, secure=secure, samesite='Strict', path='/')
         return response
 
     @web.get('/api/session')

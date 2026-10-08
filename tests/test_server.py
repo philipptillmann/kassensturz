@@ -88,6 +88,30 @@ class ServerTests(unittest.TestCase):
             con.execute('UPDATE sessions SET expires=?', (int(time.time()) - 1,))
         self.assertEqual(restarted.get('/api/data').status_code, 401)
 
+    def test_remembered_session_lasts_ninety_days_and_can_be_revoked(self):
+        now = int(time.time())
+        with patch('server.time.time', return_value=now):
+            response = self.client.post('/api/login', json={'password': PASSWORD, 'remember': True}, headers={'Origin': ORIGIN})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Max-Age=7776000', response.headers['Set-Cookie'])
+        token = self.client.get_cookie('session').value
+        restarted = create_app(password=PASSWORD, public_url='').test_client()
+        restarted.set_cookie('session', token)
+        with patch('server.time.time', return_value=now + 8 * 86400):
+            self.assertEqual(restarted.get('/api/data').status_code, 200)
+        with patch('server.time.time', return_value=now + 90 * 86400):
+            self.assertEqual(restarted.get('/api/data').status_code, 401)
+        changed = create_app(password=PASSWORD + '-changed', public_url='').test_client()
+        changed.set_cookie('session', token)
+        self.assertEqual(changed.get('/api/data').status_code, 401)
+        self.assertEqual(self.post('/api/logout', {}, response.json['csrf']).status_code, 200)
+        restarted.set_cookie('session', token)
+        self.assertEqual(restarted.get('/api/data').status_code, 401)
+        short = self.client.post('/api/login', json={'password': PASSWORD, 'remember': False}, headers={'Origin': ORIGIN})
+        self.assertIn('Max-Age=604800', short.headers['Set-Cookie'])
+        invalid = self.client.post('/api/login', json={'password': PASSWORD, 'remember': 'yes'}, headers={'Origin': ORIGIN})
+        self.assertEqual(invalid.status_code, 400)
+
     def test_password_rotation_invalidates_sessions(self):
         self.login()
         token = self.client.get_cookie('session').value

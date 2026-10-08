@@ -8,7 +8,8 @@ form.addEventListener('submit', async event => {
   try {
     const response = await fetch('/api/login', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({password: document.getElementById('password').value})
+      body: JSON.stringify({password: document.getElementById('password').value,
+                            remember: document.getElementById('remember').checked})
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Anmeldung fehlgeschlagen.');

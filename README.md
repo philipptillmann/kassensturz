@@ -145,7 +145,12 @@ docker compose up -d --build
 
 Daten liegen im Docker-Volume `kassensturz_data` unter `/data/expenses.sqlite3`. Container laufen ohne Root-Rechte, mit schreibgeschütztem Dateisystem und separatem temporären Speicher. Container-Neustarts und neue Images behalten die Daten. **`docker compose down --volumes` löscht die Daten-Volumes**; im normalen Betrieb nur `down` ohne diese Option verwenden.
 
-Sitzungen gelten sieben Tage, überleben Neustarts und lassen sich pro Gerät abmelden. Eine Änderung von `APP_PASSWORD` mit anschließendem `docker compose up -d` macht alte Sitzungen ungültig. Alle Geräte müssen sich neu anmelden. Als Alternative zur Umgebungsvariable unterstützt der Server `APP_PASSWORD_FILE`, z. B. für eine gemountete Docker-Secret-Datei. Daten und Passwortkonfiguration sind nicht für andere Benutzer des Servers bestimmt; die Datenbank ist nicht zusätzlich verschlüsselt.
+Mit der standardmäßig aktivierten Option „Angemeldet bleiben“ gelten neue Sitzungen
+90 Tage; ohne diese Option sieben Tage. Sitzungen überleben Neustarts und Updates
+und lassen sich pro Gerät abmelden. Bestehende Sitzungen behalten ihre ursprüngliche
+Laufzeit; für 90 Tage einmal abmelden und mit der aktivierten Option neu anmelden.
+Der Browser speichert ein Sitzungscookie, nicht das Passwort. Immer dieselbe
+Serveradresse verwenden: IP-Adresse und Hostname haben getrennte Cookies. Eine Änderung von `APP_PASSWORD` mit anschließendem `docker compose up -d` macht alte Sitzungen ungültig. Alle Geräte müssen sich neu anmelden. Als Alternative zur Umgebungsvariable unterstützt der Server `APP_PASSWORD_FILE`, z. B. für eine gemountete Docker-Secret-Datei. Daten und Passwortkonfiguration sind nicht für andere Benutzer des Servers bestimmt; die Datenbank ist nicht zusätzlich verschlüsselt.
 
 ### Konsistentes Backup im laufenden Betrieb
 
