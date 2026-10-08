@@ -1,14 +1,30 @@
 const $=id=>document.getElementById(id), euro=n=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(n/100);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let csrf='';
+let dataset=sessionStorage.getItem('kassensturz-dataset')==='demo'?'demo':'private', pending=0;
+$('dataset').value=dataset;
 let state={transactions:[],categories:[]}, editing=null, csvText='', currentView='overview';
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 $('month').value=today().slice(0,7);
-async function api(path,data){const r=await fetch('/api/'+path,data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(data)});if(r.status===401){window.location.replace('/login');throw Error('Bitte anmelden.')}if(!r.ok){let msg='Anfrage fehlgeschlagen.';try{msg=(await r.json()).error}catch{}throw Error(msg)}return r.json()}
+async function api(path,data){
+  pending++;$('dataset').disabled=true;
+  try {
+    const r=await fetch('/api/'+path+'?dataset='+encodeURIComponent(dataset),data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(data)});
+    if(r.status===401){window.location.replace('/login');throw Error('Bitte anmelden.')}
+    if(!r.ok){let msg='Anfrage fehlgeschlagen.';try{msg=(await r.json()).error}catch{}throw Error(msg)}
+    return await r.json();
+  } finally {pending--;$('dataset').disabled=pending>0}
+}
+$('dataset').onchange=async()=>{
+  if(pending||$('editor').open||$('importDialog').open){$('dataset').value=dataset;notice('Bitte den aktuellen Vorgang zuerst abschließen oder schließen.');return}
+  const previous=dataset;dataset=$('dataset').value;document.querySelector('main').inert=true;
+  try{await refresh();sessionStorage.setItem('kassensturz-dataset',dataset);editing=null;csvText='';$('search').value='';$('csv').value='';render();notice(dataset==='demo'?'Datensatz: Demo.':'Datensatz: Privat.')}catch(e){dataset=previous;$('dataset').value=dataset;notice(e.message)}finally{document.querySelector('main').inert=false}
+};
+
 function notice(s){$('notice').textContent=s}
 async function refresh(){state=await api('data');render()}
 function options(selected='Unkategorisiert'){return state.categories.map(c=>`<option ${c===selected?'selected':''}>${esc(c)}</option>`).join('')}
-function render(){const month=$('month').value,query=$('search').value.toLocaleLowerCase();const all=state.transactions.filter(t=>!month||t.date.startsWith(month));const filtered=all.filter(t=>JSON.stringify([t.merchant,t.category,t.items]).toLocaleLowerCase().includes(query));
+function render(){$('export').href='/api/export?dataset='+encodeURIComponent(dataset);$('export').download='kassensturz-'+dataset+'.csv';const month=$('month').value,query=$('search').value.toLocaleLowerCase();const all=state.transactions.filter(t=>!month||t.date.startsWith(month));const filtered=all.filter(t=>JSON.stringify([t.merchant,t.category,t.items]).toLocaleLowerCase().includes(query));
 $('total').textContent=euro(all.reduce((n,t)=>n+Math.max(t.amount,0),0));$('credits').textContent=euro(all.reduce((n,t)=>n+Math.max(-t.amount,0),0));$('uncat').textContent=all.filter(t=>t.items.length?t.items.some(i=>i.category==='Unkategorisiert'):t.category==='Unkategorisiert').length;
 const cats={};all.forEach(t=>(t.items.length?t.items:[t]).forEach(i=>{if(i.amount>0)cats[i.category]=(cats[i.category]||0)+i.amount}));const entries=Object.entries(cats).sort((a,b)=>b[1]-a[1]);const max=Math.max(...Object.values(cats),1);
 $('chart').innerHTML=entries.length?entries.map(([c,n],i)=>`<div class="categoryrow"><div class="categoryline"><span>${esc(c)}</span><b>${euro(n)}</b></div><div class="bar"><span class="c${i%5}" data-width="${n/max*100}"></span></div></div>`).join(''):'<p class="empty">Keine Ausgaben in diesem Monat.</p>';
@@ -30,7 +46,7 @@ $('expenseForm').onsubmit=async e=>{e.preventDefault();$('editError').textConten
 $('delete').onclick=async()=>{if(!confirm('Diese Buchung und ihre Positionen wirklich löschen?'))return;try{await api('delete',{id:editing});$('editor').close();await refresh();notice('Buchung gelöscht.')}catch(e){$('editError').textContent=e.message}};
 $('categoryForm').onsubmit=async e=>{e.preventDefault();try{await api('category',{name:$('categoryName').value});$('categoryName').value='';await refresh()}catch(e){notice(e.message)}};
 $('photo').onchange=async()=>{const file=$('photo').files[0];if(!file)return;if(file.size>12000000){$('editError').textContent='Bild ist zu groß. Maximal 12 MB.';return}$('photo').disabled=true;$('save').disabled=true;$('ocrStatus').textContent='Text wird auf dem Server erkannt …';$('editError').textContent='';try{const image=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=reject;reader.readAsDataURL(file)});const r=await api('ocr',{image});$('ocrText').textContent=r.text;$('ocrDetails').hidden=false;r.items.forEach(addItem);$('ocrStatus').textContent=`${r.items.length} mögliche Positionen erkannt. Bitte Namen, Beträge und Kategorien prüfen.`;if(!r.items.length)$('ocrDetails').open=true}catch(e){$('editError').textContent=e.message;$('ocrStatus').textContent='Manuelle Erfassung ist weiterhin möglich.'}finally{$('photo').disabled=false;$('save').disabled=false}};
-$('csv').onchange=async()=>{const file=$('csv').files[0];if(!file)return;try{const bytes=await file.arrayBuffer();csvText=new TextDecoder('utf-8').decode(bytes);if(csvText.includes('\ufffd'))csvText=new TextDecoder('windows-1252').decode(bytes);const r=await api('import-preview',{text:csvText});for(const [id,regex] of [['dateColumn',/buchungstag|buchungsdatum|datum|date/i],['merchantColumn',/empfänger|auftraggeber|merchant|beschreibung|verwendungszweck/i],['amountColumn',/betrag|amount|umsatz/i]]){$(id).innerHTML=r.headers.map(h=>`<option>${esc(h)}</option>`).join('');const match=r.headers.find(h=>regex.test(h));if(match)$(id).value=match}$('importCount').textContent=`${r.count} Buchungen gefunden. Bitte Spalten und Vorzeichen prüfen.`;$('csvPreview').textContent=r.rows.map(row=>JSON.stringify(row,null,2)).join('\n');$('importError').textContent='';$('importDialog').showModal()}catch(e){notice(e.message)}finally{$('csv').value=''}};
+$('csv').onchange=async()=>{const targetDataset=dataset;const file=$('csv').files[0];if(!file)return;try{const bytes=await file.arrayBuffer();if(dataset!==targetDataset)return;csvText=new TextDecoder('utf-8').decode(bytes);if(csvText.includes('\ufffd'))csvText=new TextDecoder('windows-1252').decode(bytes);const r=await api('import-preview',{text:csvText});for(const [id,regex] of [['dateColumn',/buchungstag|buchungsdatum|datum|date/i],['merchantColumn',/empfänger|auftraggeber|merchant|beschreibung|verwendungszweck/i],['amountColumn',/betrag|amount|umsatz/i]]){$(id).innerHTML=r.headers.map(h=>`<option>${esc(h)}</option>`).join('');const match=r.headers.find(h=>regex.test(h));if(match)$(id).value=match}$('importCount').textContent=`${r.count} Buchungen gefunden. Bitte Spalten und Vorzeichen prüfen.`;$('csvPreview').textContent=r.rows.map(row=>JSON.stringify(row,null,2)).join('\n');$('importError').textContent='';$('importDialog').showModal()}catch(e){notice(e.message)}finally{$('csv').value=''}};
 $('closeImport').onclick=()=>$('importDialog').close();$('importForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{const r=await api('import',{text:csvText,date_column:$('dateColumn').value,merchant_column:$('merchantColumn').value,amount_column:$('amountColumn').value,bank_sign:$('bankSign').checked});$('importDialog').close();await refresh();view('transactions');notice(`${r.added} Buchungen importiert, ${r.skipped} bereits vorhandene übersprungen. Monat oben ggf. anpassen.`)}catch(e){$('importError').textContent=e.message}finally{button.disabled=false}};
 async function boot(){csrf=(await api('session')).csrf;await refresh()}
 $('logout').onclick=async()=>{try{await api('logout',{});window.location.replace('/login')}catch(e){notice(e.message)}};

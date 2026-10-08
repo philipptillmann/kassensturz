@@ -7,15 +7,16 @@ ROOT = Path(__file__).resolve().parent
 DB = Path(os.environ.get('DATA_DIR', str(ROOT / 'data'))) / 'expenses.sqlite3'
 CATEGORIES = ['Unkategorisiert', 'Lebensmittel', 'Wohnen', 'Küche & Haushalt', 'Fahrrad', 'Mobilität', 'Shopping', 'Freizeit', 'Gesundheit', 'Abos', 'Reisen']
 
-def connect():
-    con = sqlite3.connect(DB, timeout=15)
+def connect(db=None):
+    con = sqlite3.connect(DB if db is None else db, timeout=15)
     con.row_factory = sqlite3.Row
     con.execute('PRAGMA foreign_keys=ON')
     return con
 
-def init():
-    DB.parent.mkdir(parents=True, exist_ok=True)
-    with connect() as c:
+def init(db=None):
+    db = DB if db is None else Path(db)
+    db.parent.mkdir(parents=True, exist_ok=True)
+    with connect(db) as c:
         c.execute('PRAGMA journal_mode=WAL')
         c.executescript('''
         CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, csrf TEXT NOT NULL, expires INTEGER NOT NULL, auth_version TEXT NOT NULL);
@@ -24,7 +25,7 @@ def init():
         CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, name TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name));
         ''')
         c.executemany('INSERT OR IGNORE INTO categories VALUES (?)', [(x,) for x in CATEGORIES])
-    os.chmod(DB, 0o600)
+    os.chmod(db, 0o600)
 
 def cents(value):
     s = str(value).strip().replace('€','').replace('EUR','').replace(' ','').replace('\u00a0','')
@@ -49,7 +50,7 @@ def read_csv(text):
     if not reader.fieldnames or not rows: raise ValueError('CSV enthält keine Buchungen.')
     return reader.fieldnames, rows
 
-def save_transaction(d):
+def save_transaction(d, db=None):
     amount = cents(d['amount'])
     merchant = str(d['merchant']).strip()
     if not merchant: raise ValueError('Bitte einen Händler eingeben.')
@@ -59,7 +60,7 @@ def save_transaction(d):
     if any(not x[0] for x in converted): raise ValueError('Jede Position benötigt einen Namen.')
     if converted and sum(x[1] for x in converted) != amount:
         raise ValueError('Die Summe der Positionen muss exakt dem Buchungsbetrag entsprechen.')
-    with connect() as c:
+    with connect(db) as c:
         if d.get('id'):
             txid = int(d['id'])
             if not c.execute('SELECT id FROM transactions WHERE id=?',(txid,)).fetchone(): raise ValueError('Buchung nicht gefunden.')
@@ -70,7 +71,7 @@ def save_transaction(d):
         c.executemany('INSERT INTO items(transaction_id,name,amount,category) VALUES (?,?,?,?)',[(txid,*x) for x in converted])
     return {'id': txid}
 
-def import_csv(d):
+def import_csv(d, db=None):
     _, rows = read_csv(d['text'])
     prepared, occurrences = [], {}
     for index, row in enumerate(rows, 2):
@@ -84,7 +85,7 @@ def import_csv(d):
             key = hashlib.sha256((canonical + ':' + str(occurrences[canonical])).encode()).hexdigest()
             prepared.append((date,merchant,amount,'Unkategorisiert',key))
         except (ValueError, KeyError, TypeError) as e: raise ValueError(f'CSV-Zeile {index}: {e}')
-    with connect() as c:
+    with connect(db) as c:
         before = c.total_changes
         c.executemany('INSERT OR IGNORE INTO transactions(date,merchant,amount,category,import_key) VALUES (?,?,?,?,?)',prepared)
         added = c.total_changes-before

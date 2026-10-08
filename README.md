@@ -64,6 +64,26 @@ Bei einem bereits vorhandenen Reverse Proxy stattdessen in der Standard-Konfigur
 
 ## Funktionen
 
+### Private Daten und Demo-Datensatz
+
+Über „Datensatz“ im Kopfbereich zwischen **Privat** und **Demo · Testdaten**
+wechseln. Die Auswahl gilt pro Browser-Tab; Buchungen, Kategorien, CSV-Importe
+und Exporte gehören immer zum ausgewählten Datensatz. Vor einem Wechsel offene
+Bearbeitungs- oder Importdialoge schließen. Beide Datensätze nutzen dieselbe
+Anmeldung und sind für alle angemeldeten Haushaltsgeräte zugänglich.
+
+Bestehende Daten bleiben unverändert im privaten Datensatz
+(`/data/expenses.sqlite3`). Die Demo liegt separat in `/data/demo.sqlite3` im
+gleichen persistenten Volume. Beim ersten Start werden Beispieldaten aus
+`sample-data/demo.json` angelegt, datiert auf den aktuellen und vorherigen Monat.
+Diese JSON-Datei enthält ausschließlich erfundene Daten und ist in Git enthalten.
+Demo-Buchungen können bearbeitet werden; Updates und Neustarts überschreiben
+diese Änderungen nicht und fügen gelöschte Beispiele nicht wieder hinzu.
+Private Datenbanken und `.env` bleiben von Git ausgeschlossen. Für die Entwicklung
+hier den Demo-Datensatz verwenden; private Daten verbleiben auf dem eigenen Server.
+Das oben dokumentierte Backup sichert den privaten Datensatz. Für ein Demo-Backup
+stattdessen `/data/demo.sqlite3` als Quelldatenbank verwenden.
+
 - Monatsübersicht, Suche, eigene Kategorien und CSV-Export.
 - CSV-Bankimport mit frei zugeordneten Spalten, UTF-8/Windows-1252 sowie deutscher Betrags- und Datumsdarstellung. Aktuell nur EUR.
 - Eine Buchung lässt sich in einzelne Artikel mit verschiedenen Kategorien aufteilen. Die Positionssumme muss dem Buchungsbetrag entsprechen.

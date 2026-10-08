@@ -147,6 +147,48 @@ class ServerTests(unittest.TestCase):
         finally:
             receipts.OCR_SLOT.release()
 
+    def test_dataset_isolation_and_restart(self):
+        csrf = self.login()
+        def post(action, data, dataset):
+            return self.post('/api/' + action + '?dataset=' + dataset, data, csrf)
+        demo = self.client.get('/api/data?dataset=demo').json
+        self.assertGreater(len(demo['transactions']), 10)
+        self.assertTrue(any(t['items'] for t in demo['transactions']))
+        self.assertEqual(self.client.get('/api/data').json['transactions'], [])
+        self.assertEqual(post('category', {'name': 'Nur privat'}, 'private').status_code, 200)
+        self.assertNotIn('Nur privat', self.client.get('/api/data?dataset=demo').json['categories'])
+        private_tx = {'merchant': 'Private purchase', 'date': '2026-10-08', 'amount': '10', 'category': 'Nur privat'}
+        private_id = post('transaction', private_tx, 'private').json['id']
+        demo_id = next(t['id'] for t in demo['transactions'] if t['id'] == private_id)
+        self.assertEqual(post('delete', {'id': demo_id}, 'demo').status_code, 200)
+        self.assertEqual(self.client.get('/api/data').json['transactions'][0]['merchant'], 'Private purchase')
+        csv = {'text': 'Datum;Händler;Betrag\n08.10.2026;Demo import;-4,50\n', 'date_column': 'Datum', 'merchant_column': 'Händler', 'amount_column': 'Betrag'}
+        self.assertEqual(post('import', csv, 'demo').json['added'], 1)
+        self.assertEqual(len(self.client.get('/api/data').json['transactions']), 1)
+        demo_export = self.client.get('/api/export?dataset=demo').get_data(as_text=True)
+        self.assertIn('Demo import', demo_export)
+        self.assertNotIn('Private purchase', demo_export)
+        self.assertNotIn('Demo import', self.client.get('/api/export').get_data(as_text=True))
+        private_tx.update(id=private_id, amount='12')
+        self.assertEqual(post('transaction', private_tx, 'private').status_code, 200)
+        restarted = create_app(password=PASSWORD, public_url='').test_client()
+        self.login(restarted)
+        self.assertEqual(restarted.get('/api/data').json['transactions'][0]['amount'], 1200)
+        after_restart = restarted.get('/api/data?dataset=demo').json['transactions']
+        self.assertEqual(len(after_restart), len(demo['transactions']))
+        self.assertNotIn(demo_id, [t['id'] for t in after_restart])
+        self.assertEqual(self.client.get('/api/data?dataset=../../private').status_code, 400)
+        self.assertEqual(post('delete', {'id': private_id}, 'invalid').status_code, 400)
+        anonymous = self.app.test_client()
+        self.assertEqual(anonymous.get('/api/data?dataset=demo').status_code, 401)
+
+    def test_existing_private_data_is_preserved(self):
+        ledger.save_transaction({'merchant': 'Existing expense', 'date': '2026-10-01', 'amount': '42', 'category': 'Shopping'})
+        restarted = create_app(password=PASSWORD, public_url='').test_client()
+        self.login(restarted)
+        private = restarted.get('/api/data').json['transactions']
+        self.assertEqual([(t['merchant'], t['amount']) for t in private], [('Existing expense', 4200)])
+
 
 class ReceiptTests(unittest.TestCase):
     def test_real_tesseract_receipt(self):

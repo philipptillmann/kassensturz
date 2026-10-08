@@ -16,6 +16,7 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import app as ledger
+from datasets import prepare_demo
 from receipts import OCRBusy
 
 SESSION_SECONDS = 7 * 24 * 3600
@@ -49,6 +50,8 @@ def create_app(password=None, public_url=None):
     auth_version = hashlib.pbkdf2_hmac('sha256', password.encode(), b'kassensturz-session-version-v1', 600_000).hex()
     del password
     ledger.init()
+    dataset_paths = {'private': ledger.DB, 'demo': ledger.DB.parent / 'demo.sqlite3'}
+    prepare_demo(dataset_paths['demo'])
     login_attempts = deque(maxlen=20)
     login_lock = threading.Lock()
 
@@ -82,6 +85,13 @@ def create_app(password=None, public_url=None):
             return web.redirect('/login')
         if request.method == 'POST' and not secrets.compare_digest(request.headers.get('X-CSRF-Token', ''), g.csrf):
             return failure('Sitzung ungültig. Bitte die Seite neu laden.', 403)
+        dataset = request.args.get('dataset', 'private')
+        if dataset not in dataset_paths:
+            return failure('Unbekannter Datensatz.')
+        g.dataset = dataset
+
+    def data_connect():
+        return ledger.connect(dataset_paths[g.dataset])
 
     @web.after_request
     def headers(response):
@@ -185,7 +195,7 @@ def create_app(password=None, public_url=None):
 
     @web.get('/api/data')
     def data():
-        with ledger.connect() as con:
+        with data_connect() as con:
             transactions = [dict(x) for x in con.execute('SELECT * FROM transactions ORDER BY date DESC,id DESC')]
             all_items = {}
             for item in con.execute('SELECT * FROM items ORDER BY id'):
@@ -193,7 +203,7 @@ def create_app(password=None, public_url=None):
             for transaction in transactions:
                 transaction['items'] = all_items.get(transaction['id'], [])
             categories = [x[0] for x in con.execute('SELECT name FROM categories ORDER BY name')]
-        return jsonify(transactions=transactions, categories=categories)
+        return jsonify(transactions=transactions, categories=categories, dataset=g.dataset)
 
     @web.get('/api/export')
     def export():
@@ -202,7 +212,7 @@ def create_app(password=None, public_url=None):
         writer.writerow(['Datum', 'Händler', 'Betrag EUR', 'Kategorie', 'Position'])
         def safe(value):
             return "'" + value if value.startswith(('=', '+', '-', '@', '\t', '\r')) else value
-        with ledger.connect() as con:
+        with data_connect() as con:
             for transaction in con.execute('SELECT * FROM transactions ORDER BY date DESC'):
                 items = list(con.execute('SELECT * FROM items WHERE transaction_id=? ORDER BY id', (transaction['id'],)))
                 for item in items or [transaction]:
@@ -211,7 +221,7 @@ def create_app(password=None, public_url=None):
                                      safe(item['name']) if items else ''])
         response = make_response(('\ufeff' + out.getvalue()).encode())
         response.headers['Content-Type'] = 'text/csv; charset=utf-8'
-        response.headers['Content-Disposition'] = 'attachment; filename=kassensturz.csv'
+        response.headers['Content-Disposition'] = f'attachment; filename=kassensturz-{g.dataset}.csv'
         return response
 
     @web.post('/api/<action>')
@@ -220,23 +230,23 @@ def create_app(password=None, public_url=None):
         if not isinstance(data, dict):
             return failure('JSON-Objekt erwartet.')
         if action == 'transaction':
-            result = ledger.save_transaction(data)
+            result = ledger.save_transaction(data, db=dataset_paths[g.dataset])
         elif action == 'import-preview':
             columns, rows = ledger.read_csv(data['text'])
             result = {'headers': columns, 'rows': rows[:3], 'count': len(rows)}
         elif action == 'import':
-            result = ledger.import_csv(data)
+            result = ledger.import_csv(data, db=dataset_paths[g.dataset])
         elif action == 'ocr':
             result = ledger.recognize(data)
         elif action == 'category':
             name = str(data['name']).strip()
             if not name or len(name) > 60:
                 return failure('Kategorie muss 1–60 Zeichen enthalten.')
-            with ledger.connect() as con:
+            with data_connect() as con:
                 con.execute('INSERT OR IGNORE INTO categories VALUES (?)', (name,))
             result = {'ok': True}
         elif action == 'delete':
-            with ledger.connect() as con:
+            with data_connect() as con:
                 con.execute('DELETE FROM transactions WHERE id=?', (int(data['id']),))
             result = {'ok': True}
         else:

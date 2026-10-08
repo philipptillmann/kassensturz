@@ -1,0 +1,18 @@
+[
+  {"month_offset": 0, "day": 1, "merchant": "Demo · Wohnungsmiete", "amount": "850.00", "category": "Wohnen"},
+  {"month_offset": 0, "day": 2, "merchant": "Demo · Supermarkt", "amount": "64.35", "category": "Lebensmittel"},
+  {"month_offset": 0, "day": 3, "merchant": "Demo · Amazon", "amount": "79.90", "category": "Shopping", "items": [
+    {"name": "Fahrradlicht", "amount": "34.90", "category": "Fahrrad"},
+    {"name": "Kochtopf", "amount": "45.00", "category": "Küche & Haushalt"}
+  ]},
+  {"month_offset": 0, "day": 4, "merchant": "Demo · Monatskarte", "amount": "63.00", "category": "Mobilität"},
+  {"month_offset": 0, "day": 5, "merchant": "Demo · Café", "amount": "8.40", "category": "Freizeit"},
+  {"month_offset": 0, "day": 6, "merchant": "Demo · Apotheke", "amount": "12.75", "category": "Gesundheit"},
+  {"month_offset": 0, "day": 7, "merchant": "Demo · Streaming", "amount": "9.99", "category": "Abos"},
+  {"month_offset": 0, "day": 8, "merchant": "Demo · Rückerstattung", "amount": "-19.90", "category": "Shopping"},
+  {"month_offset": 0, "day": 9, "merchant": "Demo · Kartenzahlung", "amount": "24.50", "category": "Unkategorisiert"},
+  {"month_offset": -1, "day": 1, "merchant": "Demo · Wohnungsmiete", "amount": "850.00", "category": "Wohnen"},
+  {"month_offset": -1, "day": 12, "merchant": "Demo · Supermarkt", "amount": "52.80", "category": "Lebensmittel"},
+  {"month_offset": -1, "day": 18, "merchant": "Demo · Fahrradzubehör", "amount": "27.50", "category": "Fahrrad"},
+  {"month_offset": -1, "day": 22, "merchant": "Demo · Bahnreise", "amount": "49.90", "category": "Reisen"}
+]

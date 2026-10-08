@@ -5,6 +5,9 @@
 !server.py
 !receipts.py
 !bank_providers.py
+!datasets.py
+!sample-data/
+!sample-data/*.json
 !static/
 !static/**
 !tests/

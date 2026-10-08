@@ -14,7 +14,8 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py server.py receipts.py bank_providers.py ./
+COPY app.py server.py receipts.py bank_providers.py datasets.py ./
+COPY sample-data ./sample-data
 COPY static ./static
 COPY tests ./tests
 USER 10001:10001
