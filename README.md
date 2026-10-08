@@ -77,6 +77,35 @@ Rechnungen für bereits importierte Umsätze **an der bestehenden Buchung** erfa
 
 ## Betrieb und Daten
 
+### Updates per SSH / Termius
+
+Für die erste Installation den Branch `server` klonen und `.env` wie oben
+einrichten. Docker Engine mit Compose v2 muss installiert sein; der SSH-Benutzer
+benötigt Zugriff auf Docker. Danach in Termius auf dem Linux-Server ausführen:
+
+```sh
+~/kassensturz/update.sh
+# Bei der HTTPS-Installation stattdessen immer:
+~/kassensturz/update.sh --https
+```
+
+Den Pfad an den eigenen Installationsordner anpassen. Das Skript funktioniert
+aus jedem Arbeitsverzeichnis, lädt `origin/server` mit Fast-forward-Prüfung,
+baut das Image und wartet bis zu 120 Sekunden auf gesunde Container. Lokale
+Quellcodeänderungen oder ein anderer Branch stoppen das Update. `.env` und das
+Daten-Volume bleiben erhalten. Ein fehlgeschlagener Build lässt die laufende
+App verfügbar; ein fehlgeschlagener Containerstart führt zu einem Fehler, ohne
+automatisch auf die alte Version zurückzurollen. Zur Diagnose
+`docker compose logs --tail=100 app` verwenden (bei HTTPS mit
+`-f compose.https.yaml`). Vor größeren Änderungen ein Backup erstellen.
+
+Entwicklungsablauf: Änderungen hier entwickeln und prüfen, eine funktionierende
+Version nach GitHub auf `server` pushen, das Skript in Termius ausführen und die
+vorhandene App-Adresse im Handy-Browser neu laden. Noch nicht gepushte Änderungen
+sind auf dem Linux-Server nicht verfügbar. Beim ersten Wechsel zwischen HTTP und
+HTTPS die oben beschriebenen Schritte verwenden; das Skript ist für Updates der
+bereits gewählten Installation gedacht.
+
 ```sh
 docker compose logs --tail=100 app
 docker compose stop
