@@ -189,6 +189,22 @@ class ServerTests(unittest.TestCase):
         private = restarted.get('/api/data').json['transactions']
         self.assertEqual([(t['merchant'], t['amount']) for t in private], [('Existing expense', 4200)])
 
+    def test_home_screen_assets_are_available_before_login(self):
+        manifest = self.client.get('/manifest.webmanifest')
+        self.assertEqual(manifest.status_code, 200)
+        self.assertEqual(manifest.json['name'], 'Kassensturz')
+        self.assertEqual(manifest.json['start_url'], '/')
+        manifest.close()
+        for size in (180, 192, 512):
+            response = self.client.get(f'/icons/icon-{size}.png')
+            self.assertEqual(response.status_code, 200)
+            with Image.open(io.BytesIO(response.data)) as icon:
+                self.assertEqual(icon.size, (size, size))
+            response.close()
+        with self.client.get('/icons/icon.svg') as response:
+            self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.client.get('/api/data').status_code, 401)
+
 
 class ReceiptTests(unittest.TestCase):
     def test_real_tesseract_receipt(self):

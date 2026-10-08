@@ -66,7 +66,8 @@ def create_app(password=None, public_url=None):
                 return failure('Ungültiger Ursprung. Bitte die konfigurierte Serveradresse verwenden.', 403)
             if not request.is_json:
                 return failure('JSON erwartet.', 415)
-        public_paths = {'/login', '/login.js', '/style.css', '/api/login', '/healthz'}
+        public_paths = {'/login', '/login.js', '/style.css', '/api/login', '/healthz', '/manifest.webmanifest',
+                        '/icons/icon.svg', '/icons/icon-180.png', '/icons/icon-192.png', '/icons/icon-512.png'}
         if request.path in public_paths:
             return None
         token = request.cookies.get('session', '')
@@ -140,8 +141,13 @@ def create_app(password=None, public_url=None):
 
     @web.get('/login.js')
     @web.get('/style.css')
+    @web.get('/manifest.webmanifest')
     def public_asset():
         return send_from_directory(ledger.ROOT / 'static', request.path[1:])
+
+    @web.get('/icons/<filename>')
+    def icon(filename):
+        return send_from_directory(ledger.ROOT / 'static' / 'icons', filename)
 
     @web.post('/api/login')
     def login():

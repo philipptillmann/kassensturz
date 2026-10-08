@@ -39,6 +39,15 @@ Das Handy benötigt keine eigene App. „Rechnung scannen“ öffnet die Fotoaus
 
 Die Standard-Konfiguration verwendet HTTP und ist für ein vertrauenswürdiges privates Netzwerk gedacht. Für Zugriff über das Internet die folgende HTTPS-Variante verwenden. Keine HTTP-Portfreigabe ins Internet einrichten.
 
+### App auf dem iPhone-Home-Bildschirm
+
+In Safari die App-Adresse öffnen und über „Teilen“ → „Zum Home-Bildschirm“
+hinzufügen. Name und Symbol sind als Kassensturz hinterlegt. Nach einem Update
+ein bestehendes Home-Bildschirm-Symbol bei Bedarf entfernen und neu hinzufügen,
+weil iOS das alte Symbol speichern kann. Das entfernt keine Serverdaten.
+Die App benötigt weiterhin eine Verbindung zum Server; es gibt keinen Offline-Modus.
+Für die reguläre PWA-Installation in anderen Browsern HTTPS verwenden.
+
 ## HTTPS mit eigener Domain
 
 Die zusätzliche Compose-Datei enthält Caddy für automatische TLS-Zertifikate. Eine Domain muss auf den Server zeigen; TCP-Ports 80 und 443 müssen von außen erreichbar sein. Bei einem Heimserver sind dafür ggf. Router-Portweiterleitungen nötig.
