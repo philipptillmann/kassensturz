@@ -201,8 +201,9 @@ def create_app(password=None, public_url=None):
         return send_from_directory(ledger.ROOT / 'static', 'index.html')
 
     @web.get('/app.js')
+    @web.get('/charts.js')
     def javascript():
-        return send_from_directory(ledger.ROOT / 'static', 'app.js')
+        return send_from_directory(ledger.ROOT / 'static', request.path[1:])
 
     @web.get('/api/data')
     def data():

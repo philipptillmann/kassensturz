@@ -11,10 +11,14 @@ def prepare_demo(db):
     today = datetime.date.today()
     with ledger.connect(db) as con:
         con.execute('CREATE TABLE IF NOT EXISTS dataset_meta(key TEXT PRIMARY KEY)')
-        if con.execute("SELECT 1 FROM dataset_meta WHERE key='seeded'").fetchone():
-            return
+        seeded = {row[0] for row in con.execute('SELECT key FROM dataset_meta')}
+        groups = set()
         # The seed and marker are one transaction, so a restart cannot duplicate data.
         for sample in samples:
+            group = 'seeded' if not sample.get('seed_group') else 'seeded-' + sample['seed_group']
+            if group in seeded:
+                continue
+            groups.add(group)
             month = today.year * 12 + today.month - 1 + sample['month_offset']
             year, month = divmod(month, 12)
             date = datetime.date(year, month + 1, sample['day']).isoformat()
@@ -27,4 +31,4 @@ def prepare_demo(db):
                 (date, sample['merchant'], amount, sample['category'])).lastrowid
             con.executemany('INSERT INTO items(transaction_id,name,amount,category) VALUES (?,?,?,?)',
                             [(txid, item['name'], ledger.cents(item['amount']), item['category']) for item in items])
-        con.execute("INSERT INTO dataset_meta VALUES ('seeded')")
+        con.executemany('INSERT INTO dataset_meta VALUES (?)', [(group,) for group in sorted(groups)])

@@ -1,18 +1,1585 @@
 [
-  {"month_offset": 0, "day": 1, "merchant": "Demo · Wohnungsmiete", "amount": "850.00", "category": "Wohnen"},
-  {"month_offset": 0, "day": 2, "merchant": "Demo · Supermarkt", "amount": "64.35", "category": "Lebensmittel"},
-  {"month_offset": 0, "day": 3, "merchant": "Demo · Amazon", "amount": "79.90", "category": "Shopping", "items": [
-    {"name": "Fahrradlicht", "amount": "34.90", "category": "Fahrrad"},
-    {"name": "Kochtopf", "amount": "45.00", "category": "Küche & Haushalt"}
-  ]},
-  {"month_offset": 0, "day": 4, "merchant": "Demo · Monatskarte", "amount": "63.00", "category": "Mobilität"},
-  {"month_offset": 0, "day": 5, "merchant": "Demo · Café", "amount": "8.40", "category": "Freizeit"},
-  {"month_offset": 0, "day": 6, "merchant": "Demo · Apotheke", "amount": "12.75", "category": "Gesundheit"},
-  {"month_offset": 0, "day": 7, "merchant": "Demo · Streaming", "amount": "9.99", "category": "Abos"},
-  {"month_offset": 0, "day": 8, "merchant": "Demo · Rückerstattung", "amount": "-19.90", "category": "Shopping"},
-  {"month_offset": 0, "day": 9, "merchant": "Demo · Kartenzahlung", "amount": "24.50", "category": "Unkategorisiert"},
-  {"month_offset": -1, "day": 1, "merchant": "Demo · Wohnungsmiete", "amount": "850.00", "category": "Wohnen"},
-  {"month_offset": -1, "day": 12, "merchant": "Demo · Supermarkt", "amount": "52.80", "category": "Lebensmittel"},
-  {"month_offset": -1, "day": 18, "merchant": "Demo · Fahrradzubehör", "amount": "27.50", "category": "Fahrrad"},
-  {"month_offset": -1, "day": 22, "merchant": "Demo · Bahnreise", "amount": "49.90", "category": "Reisen"}
+  {
+    "month_offset": 0,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "month_offset": 0,
+    "day": 2,
+    "merchant": "Demo · Supermarkt",
+    "amount": "64.35",
+    "category": "Lebensmittel"
+  },
+  {
+    "month_offset": 0,
+    "day": 3,
+    "merchant": "Demo · Amazon",
+    "amount": "79.90",
+    "category": "Shopping",
+    "items": [
+      {
+        "name": "Fahrradlicht",
+        "amount": "34.90",
+        "category": "Fahrrad"
+      },
+      {
+        "name": "Kochtopf",
+        "amount": "45.00",
+        "category": "Küche & Haushalt"
+      }
+    ]
+  },
+  {
+    "month_offset": 0,
+    "day": 4,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "month_offset": 0,
+    "day": 5,
+    "merchant": "Demo · Café",
+    "amount": "8.40",
+    "category": "Freizeit"
+  },
+  {
+    "month_offset": 0,
+    "day": 6,
+    "merchant": "Demo · Apotheke",
+    "amount": "12.75",
+    "category": "Gesundheit"
+  },
+  {
+    "month_offset": 0,
+    "day": 7,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  },
+  {
+    "month_offset": 0,
+    "day": 8,
+    "merchant": "Demo · Rückerstattung",
+    "amount": "-19.90",
+    "category": "Shopping"
+  },
+  {
+    "month_offset": 0,
+    "day": 9,
+    "merchant": "Demo · Kartenzahlung",
+    "amount": "24.50",
+    "category": "Unkategorisiert"
+  },
+  {
+    "month_offset": -1,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "month_offset": -1,
+    "day": 12,
+    "merchant": "Demo · Supermarkt",
+    "amount": "52.80",
+    "category": "Lebensmittel"
+  },
+  {
+    "month_offset": -1,
+    "day": 18,
+    "merchant": "Demo · Fahrradzubehör",
+    "amount": "27.50",
+    "category": "Fahrrad"
+  },
+  {
+    "month_offset": -1,
+    "day": 22,
+    "merchant": "Demo · Bahnreise",
+    "amount": "49.90",
+    "category": "Reisen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "58.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "34.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "47.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "60.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "73.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "9.60",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "28.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "18.50",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "14.90",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 20,
+    "merchant": "Demo · Werkzeug & Zubehör",
+    "amount": "54.90",
+    "category": "Fahrrad"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 16,
+    "merchant": "Demo · Versandhandel",
+    "amount": "43.40",
+    "category": "Shopping",
+    "items": [
+      {
+        "name": "Fahrradzubehör",
+        "amount": "24.90",
+        "category": "Fahrrad"
+      },
+      {
+        "name": "Küchenutensilien",
+        "amount": "18.50",
+        "category": "Küche & Haushalt"
+      }
+    ]
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": 0,
+    "day": 22,
+    "merchant": "Demo · Kartenzahlung",
+    "amount": "17.40",
+    "category": "Unkategorisiert"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "62.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "51.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "64.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "77.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "45.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "11.70",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "39.50",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "28.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "18.30",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 10,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 12,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 21,
+    "merchant": "Demo · Bahn & Unterkunft",
+    "amount": "195.00",
+    "category": "Reisen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 23,
+    "merchant": "Demo · Kleidung",
+    "amount": "73.95",
+    "category": "Shopping"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -1,
+    "day": 27,
+    "merchant": "Demo · Retourengutschrift",
+    "amount": "-19.95",
+    "category": "Shopping"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "66.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "68.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "36.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "49.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "62.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "13.80",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "51.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "18.50",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "21.70",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 10,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 12,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -2,
+    "day": 16,
+    "merchant": "Demo · Versandhandel",
+    "amount": "49.40",
+    "category": "Shopping",
+    "items": [
+      {
+        "name": "Fahrradzubehör",
+        "amount": "28.90",
+        "category": "Fahrrad"
+      },
+      {
+        "name": "Küchenutensilien",
+        "amount": "20.50",
+        "category": "Küche & Haushalt"
+      }
+    ]
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "58.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "40.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "53.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "66.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "34.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "15.90",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "62.50",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "28.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "25.10",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 10,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 12,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -3,
+    "day": 20,
+    "merchant": "Demo · Werkzeug & Zubehör",
+    "amount": "63.90",
+    "category": "Fahrrad"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "62.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "57.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "70.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "38.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "51.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "9.60",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "74.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "18.50",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "28.50",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 10,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 12,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 23,
+    "merchant": "Demo · Kleidung",
+    "amount": "85.95",
+    "category": "Shopping"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 27,
+    "merchant": "Demo · Retourengutschrift",
+    "amount": "-19.95",
+    "category": "Shopping"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 16,
+    "merchant": "Demo · Versandhandel",
+    "amount": "55.40",
+    "category": "Shopping",
+    "items": [
+      {
+        "name": "Fahrradzubehör",
+        "amount": "32.90",
+        "category": "Fahrrad"
+      },
+      {
+        "name": "Küchenutensilien",
+        "amount": "22.50",
+        "category": "Küche & Haushalt"
+      }
+    ]
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -4,
+    "day": 22,
+    "merchant": "Demo · Kartenzahlung",
+    "amount": "21.40",
+    "category": "Unkategorisiert"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "66.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "74.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "42.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "55.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "68.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "11.70",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "28.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "28.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "14.90",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 10,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 12,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -5,
+    "day": 21,
+    "merchant": "Demo · Bahn & Unterkunft",
+    "amount": "275.00",
+    "category": "Reisen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "58.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "46.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "59.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "72.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "40.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "13.80",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "39.50",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "18.50",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "18.30",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 10,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 12,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 20,
+    "merchant": "Demo · Werkzeug & Zubehör",
+    "amount": "72.90",
+    "category": "Fahrrad"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -6,
+    "day": 16,
+    "merchant": "Demo · Versandhandel",
+    "amount": "61.40",
+    "category": "Shopping",
+    "items": [
+      {
+        "name": "Fahrradzubehör",
+        "amount": "36.90",
+        "category": "Fahrrad"
+      },
+      {
+        "name": "Küchenutensilien",
+        "amount": "24.50",
+        "category": "Küche & Haushalt"
+      }
+    ]
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "62.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "63.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "76.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "44.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "57.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "15.90",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "51.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "28.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "21.70",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 10,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 12,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 23,
+    "merchant": "Demo · Kleidung",
+    "amount": "97.95",
+    "category": "Shopping"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -7,
+    "day": 27,
+    "merchant": "Demo · Retourengutschrift",
+    "amount": "-19.95",
+    "category": "Shopping"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "66.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "35.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "48.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "61.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "74.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "9.60",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "62.50",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "18.50",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "25.10",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 10,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 12,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 16,
+    "merchant": "Demo · Versandhandel",
+    "amount": "67.40",
+    "category": "Shopping",
+    "items": [
+      {
+        "name": "Fahrradzubehör",
+        "amount": "40.90",
+        "category": "Fahrrad"
+      },
+      {
+        "name": "Küchenutensilien",
+        "amount": "26.50",
+        "category": "Küche & Haushalt"
+      }
+    ]
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -8,
+    "day": 22,
+    "merchant": "Demo · Kartenzahlung",
+    "amount": "25.40",
+    "category": "Unkategorisiert"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "58.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "52.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "65.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "78.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "46.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "11.70",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "74.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "28.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "28.50",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 10,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 12,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 20,
+    "merchant": "Demo · Werkzeug & Zubehör",
+    "amount": "81.90",
+    "category": "Fahrrad"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -9,
+    "day": 21,
+    "merchant": "Demo · Bahn & Unterkunft",
+    "amount": "355.00",
+    "category": "Reisen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "62.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "69.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "37.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "50.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "63.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "13.80",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "28.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "18.50",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "14.90",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 10,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 12,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 23,
+    "merchant": "Demo · Kleidung",
+    "amount": "109.95",
+    "category": "Shopping"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 27,
+    "merchant": "Demo · Retourengutschrift",
+    "amount": "-19.95",
+    "category": "Shopping"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -10,
+    "day": 16,
+    "merchant": "Demo · Versandhandel",
+    "amount": "73.40",
+    "category": "Shopping",
+    "items": [
+      {
+        "name": "Fahrradzubehör",
+        "amount": "44.90",
+        "category": "Fahrrad"
+      },
+      {
+        "name": "Küchenutensilien",
+        "amount": "28.50",
+        "category": "Küche & Haushalt"
+      }
+    ]
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 1,
+    "merchant": "Demo · Wohnungsmiete",
+    "amount": "850.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 2,
+    "merchant": "Demo · Strom",
+    "amount": "66.00",
+    "category": "Wohnen"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 3,
+    "merchant": "Demo · Internet",
+    "amount": "29.99",
+    "category": "Abos"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 4,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "41.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 11,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "54.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 18,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "67.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 25,
+    "merchant": "Demo · Wochenmarkt",
+    "amount": "35.20",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 7,
+    "merchant": "Demo · Bäckerei",
+    "amount": "15.90",
+    "category": "Lebensmittel"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 8,
+    "merchant": "Demo · Restaurant",
+    "amount": "39.50",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 14,
+    "merchant": "Demo · Kino",
+    "amount": "28.00",
+    "category": "Freizeit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 9,
+    "merchant": "Demo · Drogerie",
+    "amount": "18.30",
+    "category": "Gesundheit"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 10,
+    "merchant": "Demo · Monatskarte",
+    "amount": "63.00",
+    "category": "Mobilität"
+  },
+  {
+    "seed_group": "graphs-v1",
+    "month_offset": -11,
+    "day": 12,
+    "merchant": "Demo · Streaming",
+    "amount": "9.99",
+    "category": "Abos"
+  }
 ]

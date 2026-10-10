@@ -88,12 +88,20 @@ gleichen persistenten Volume. Beim ersten Start werden Beispieldaten aus
 Diese JSON-Datei enthält ausschließlich erfundene Daten und ist in Git enthalten.
 Demo-Buchungen können bearbeitet werden; Updates und Neustarts überschreiben
 diese Änderungen nicht und fügen gelöschte Beispiele nicht wieder hinzu.
+Neue Beispielgruppen können bei einem Update einmalig ergänzt werden. Die
+Diagramm-Beispiele erweitern auch bestehende Demo-Datensätze auf zwölf Monate,
+ohne vorhandene Demo-Buchungen oder private Daten zu ändern.
 Private Datenbanken und `.env` bleiben von Git ausgeschlossen. Für die Entwicklung
 hier den Demo-Datensatz verwenden; private Daten verbleiben auf dem eigenen Server.
 Das oben dokumentierte Backup sichert den privaten Datensatz. Für ein Demo-Backup
 stattdessen `/data/demo.sqlite3` als Quelldatenbank verwenden.
 
 - Monatsübersicht, Suche, eigene Kategorien und CSV-Export.
+- Diagramme: monatliche Beträge, Kategorien, Kategorieverläufe und Händler.
+  Zeitraum, Kategorie und Ausgaben/Gutschriften/Verrechnung sind wählbar.
+  Aufgeteilte Buchungen werden anhand ihrer Positionen ausgewertet; Monate ohne
+  Buchungen erscheinen mit null. Die Diagrammfilter sind unabhängig vom Monat
+  auf der Übersichtsseite. Exakte Monatswerte stehen unter „Werte anzeigen“.
 - CSV-Bankimport mit frei zugeordneten Spalten, UTF-8/Windows-1252 sowie deutscher Betrags- und Datumsdarstellung. Aktuell nur EUR.
 - Eine Buchung lässt sich in einzelne Artikel mit verschiedenen Kategorien aufteilen. Die Positionssumme muss dem Buchungsbetrag entsprechen.
 - OCR auf dem Server mit Tesseract, Deutsch und Englisch. JPEG, PNG, WebP und HEIC; maximal 12 MB und 25 Megapixel. Automatische Ausrichtung anhand der EXIF-Daten.

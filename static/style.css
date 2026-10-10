@@ -111,3 +111,25 @@ pre{white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto;fo
 }
 @media(max-width:420px){.formgrid{grid-template-columns:1fr}.dataset-picker,.subline{display:flex;justify-content:space-between;margin-right:0}.dataset-picker select,.subline input{width:190px}.stat strong{font-size:25px}.stat small{max-width:160px}.cardhead button{font-size:13px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.graph-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.graph-controls label{display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--muted)}
+.graph-controls input,.graph-controls select{width:100%}
+.graph-stats{margin:24px 0}
+.graphs-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:start}
+.graph-panel{min-width:0}.graph-panel h2{margin-bottom:12px}
+.report-svg{width:100%;height:auto;display:block;min-width:300px}
+.graph-panel>div{overflow:auto}
+.graph-axis{font-size:13px;fill:var(--muted)}
+.graph-gridline{stroke:var(--line);stroke-width:1}.graph-zero{stroke:#97a497;stroke-width:1}
+.graph-column{fill:var(--accent)}.graph-column:hover,.graph-column:focus{fill:#71917a}
+.graph-column.negative{fill:#b25244}.bar span.negative{background:#b25244}
+.graph-line{fill:none;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}
+.graph-dot{stroke-width:2;stroke:#fff}.graph-dot:focus{r:7}
+.graph-color-0{stroke:#254f43;fill:#254f43;color:#254f43}.graph-color-1{stroke:#b07a32;fill:#b07a32;color:#b07a32}.graph-color-2{stroke:#557aa0;fill:#557aa0;color:#557aa0}.graph-color-3{stroke:#8a638b;fill:#8a638b;color:#8a638b}.graph-color-4{stroke:#b25244;fill:#b25244;color:#b25244}
+.graph-line{fill:none}.graph-dot{stroke:#fff}
+.graph-legend{display:flex;gap:10px 16px;flex-wrap:wrap;font-size:13px;margin:12px 0}
+.graph-legend span::before{content:'●';margin-right:6px}
+.graph-data{margin-top:18px;font-size:13px}.graph-data summary{cursor:pointer;color:var(--accent);padding:8px 0}
+.graph-data tbody tr{cursor:default}
+@media(max-width:1100px){.graphs-grid{grid-template-columns:1fr}.graph-controls{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.graph-controls{gap:12px}.graph-controls label{min-width:0}.graph-controls label:nth-child(1),.graph-controls label:nth-child(2),.graph-controls label:nth-child(3),.graph-controls label:nth-child(4),.graph-controls label:nth-child(5),.graph-controls label:nth-child(6){grid-column:1/-1}.graph-panel{padding:16px}.report-svg{min-width:0}.graph-stats .stat strong{font-size:23px}}
