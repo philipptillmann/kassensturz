@@ -145,6 +145,23 @@ innerhalb des ausgewählten Datensatzes; gleich geschriebene Namen bilden eine
 Gruppe. Die Einzelbuchungen, CSV-Exporte und Diagramme bleiben erhalten; CSV
 enthält zusätzlich den Gruppennamen. Demo enthält ein entsprechendes Geschenkbeispiel.
 
+### Kategorien umbenennen und Zahlungsmittel
+
+Unter „Einstellungen“ eine Kategorie auswählen und ihren Namen ändern. Das
+aktualisiert die Zuordnung in allen Buchungen und Rechnungspositionen des
+gewählten Datensatzes. Ein bereits vorhandener Zielname wird abgelehnt; Kategorien
+werden nicht automatisch zusammengelegt. Auch die Standardkategorien einschließlich
+„Unkategorisiert“ können umbenannt werden. Importe und OCR-Vorschläge verwenden
+danach die umbenannten Standardkategorien.
+
+Unter „Zahlungsmittel“ sind Bar und PayPal vorbereitet; weitere Namen wie ING,
+Sparkasse oder eine bestimmte Karte selbst anlegen. Jede Buchung hat ein optionales
+Zahlungsmittel, das auch für ihre Rechnungspositionen gilt. Alte Buchungen bleiben
+bei „Nicht angegeben“. Beim CSV-Import kann ein Zahlungsmittel für alle neu
+importierten Buchungen ausgewählt werden; übersprungene Duplikate bleiben
+unverändert. Zahlungsmittel erscheinen in der Buchungsliste, Gruppenansicht und
+im CSV-Export. Beide Datensätze haben eigene Listen und Zuordnungen.
+
 ## Betrieb und Daten
 
 ### Updates per SSH / Termius

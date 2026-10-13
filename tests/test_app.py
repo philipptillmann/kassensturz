@@ -71,4 +71,26 @@ class LedgerTests(unittest.TestCase):
         with app.connect() as con:self.assertEqual([row[0] for row in con.execute('SELECT group_name FROM items ORDER BY id')],['Gift',''])
         d['items'][1]['group_name']=None;app.save_transaction(d)
         with app.connect() as con:self.assertEqual([row[0] for row in con.execute('SELECT group_name FROM items ORDER BY id')],['Gift',None])
+    def test_category_rename_updates_positions_and_survives_init(self):
+        d=self.transaction();app.save_transaction(d)
+        app.rename_category('Shopping','Einkäufe');app.rename_category('Fahrrad','Rad');app.rename_category('Unkategorisiert','Offen')
+        app.init()
+        with app.connect() as con:
+            self.assertEqual(con.execute('SELECT category FROM transactions').fetchone()[0],'Einkäufe')
+            self.assertEqual(con.execute('SELECT category FROM items ORDER BY id').fetchone()[0],'Rad')
+            names={row[0] for row in con.execute('SELECT name FROM categories')}
+            self.assertNotIn('Shopping',names);self.assertNotIn('Fahrrad',names);self.assertNotIn('Unkategorisiert',names)
+        with self.assertRaises(ValueError):app.rename_category('Rad','Lebensmittel')
+        with self.assertRaises(ValueError):app.rename_category('missing','New')
+        csv={'text':'Datum;Händler;Betrag\n01.10.2026;Test;-10,00\n','date_column':'Datum','merchant_column':'Händler','amount_column':'Betrag','payment_method':'Bar'}
+        app.import_csv(csv)
+        with app.connect() as con:self.assertEqual(tuple(con.execute("SELECT category,payment_method FROM transactions WHERE merchant='Test'").fetchone()),('Offen','Bar'))
+    def test_payment_validation_and_legacy_edit_preserve_selection(self):
+        d=self.transaction();d['payment_method']='PayPal';d['id']=app.save_transaction(d)['id']
+        del d['payment_method'];app.save_transaction(d)
+        with app.connect() as con:self.assertEqual(con.execute('SELECT payment_method FROM transactions').fetchone()[0],'PayPal')
+        d['payment_method']='Unknown'
+        with self.assertRaises(ValueError):app.save_transaction(d)
+        d['payment_method']='';app.save_transaction(d)
+        with app.connect() as con:self.assertEqual(con.execute('SELECT payment_method FROM transactions').fetchone()[0],'')
 if __name__=='__main__':unittest.main()

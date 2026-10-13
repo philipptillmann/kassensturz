@@ -215,13 +215,15 @@ def create_app(password=None, public_url=None):
             for transaction in transactions:
                 transaction['items'] = all_items.get(transaction['id'], [])
             categories = [x[0] for x in con.execute('SELECT name FROM categories ORDER BY name')]
-        return jsonify(transactions=transactions, categories=categories, dataset=g.dataset)
+            payments = [x[0] for x in con.execute('SELECT name FROM payment_methods ORDER BY name')]
+            default_category = con.execute("SELECT name FROM category_aliases WHERE alias='Unkategorisiert'").fetchone()[0]
+        return jsonify(transactions=transactions, categories=categories, payment_methods=payments, default_category=default_category, dataset=g.dataset)
 
     @web.get('/api/export')
     def export():
         out = io.StringIO()
         writer = csv.writer(out, delimiter=';')
-        writer.writerow(['Datum', 'Händler', 'Betrag EUR', 'Kategorie', 'Position', 'Gruppe'])
+        writer.writerow(['Datum', 'Händler', 'Betrag EUR', 'Kategorie', 'Position', 'Gruppe', 'Zahlungsmittel'])
         def safe(value):
             return "'" + value if value.startswith(('=', '+', '-', '@', '\t', '\r')) else value
         with data_connect() as con:
@@ -231,7 +233,7 @@ def create_app(password=None, public_url=None):
                     writer.writerow([transaction['date'], safe(transaction['merchant']),
                                      f"{item['amount'] / 100:.2f}".replace('.', ','), safe(item['category']),
                                      safe(item['name']) if items else '',
-                                     safe(transaction['group_name'] if not items or item['group_name'] is None else item['group_name'])])
+                                     safe(transaction['group_name'] if not items or item['group_name'] is None else item['group_name']), safe(transaction['payment_method'])])
         response = make_response(('\ufeff' + out.getvalue()).encode())
         response.headers['Content-Type'] = 'text/csv; charset=utf-8'
         response.headers['Content-Disposition'] = f'attachment; filename=kassensturz-{g.dataset}.csv'
@@ -251,6 +253,19 @@ def create_app(password=None, public_url=None):
             result = ledger.import_csv(data, db=dataset_paths[g.dataset])
         elif action == 'ocr':
             result = ledger.recognize(data)
+            with data_connect() as con:
+                aliases = dict(con.execute('SELECT alias,name FROM category_aliases'))
+            for item in result['items']:
+                item['category'] = aliases.get(item['category'], item['category'])
+        elif action == 'category-rename':
+            result = ledger.rename_category(data['old_name'], data['name'], db=dataset_paths[g.dataset])
+        elif action == 'payment-method':
+            name = data.get('name')
+            if not isinstance(name, str) or not name.strip() or len(name.strip()) > 60:
+                return failure('Zahlungsmittel muss 1–60 Zeichen enthalten.')
+            with data_connect() as con:
+                con.execute('INSERT OR IGNORE INTO payment_methods VALUES (?)', (name.strip(),))
+            result = {'ok': True}
         elif action == 'category':
             name = str(data['name']).strip()
             if not name or len(name) > 60:

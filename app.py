@@ -21,6 +21,8 @@ def init(db=None):
         c.executescript('''
         CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, csrf TEXT NOT NULL, expires INTEGER NOT NULL, auth_version TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS categories(name TEXT PRIMARY KEY);
+        CREATE TABLE IF NOT EXISTS category_aliases(alias TEXT PRIMARY KEY, name TEXT NOT NULL REFERENCES categories(name));
+        CREATE TABLE IF NOT EXISTS payment_methods(name TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS transactions(id INTEGER PRIMARY KEY, date TEXT NOT NULL, merchant TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name), import_key TEXT UNIQUE);
         CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, name TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name));
         ''')
@@ -28,7 +30,13 @@ def init(db=None):
             c.execute("ALTER TABLE transactions ADD COLUMN group_name TEXT NOT NULL DEFAULT ''")
         if 'group_name' not in {row['name'] for row in c.execute('PRAGMA table_info(items)')}:
             c.execute('ALTER TABLE items ADD COLUMN group_name TEXT DEFAULT NULL')
-        c.executemany('INSERT OR IGNORE INTO categories VALUES (?)', [(x,) for x in CATEGORIES])
+        if 'payment_method' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
+            c.execute("ALTER TABLE transactions ADD COLUMN payment_method TEXT NOT NULL DEFAULT ''")
+        for name in CATEGORIES:
+            if not c.execute('SELECT 1 FROM category_aliases WHERE alias=?', (name,)).fetchone():
+                c.execute('INSERT OR IGNORE INTO categories VALUES (?)', (name,))
+                c.execute('INSERT INTO category_aliases VALUES (?,?)', (name, name))
+        c.executemany('INSERT OR IGNORE INTO payment_methods VALUES (?)', [('Bar',), ('PayPal',)])
     os.chmod(db, 0o600)
 
 def cents(value):
@@ -72,6 +80,10 @@ def save_transaction(d, db=None):
     if converted and sum(x[1] for x in converted) != amount:
         raise ValueError('Die Summe der Positionen muss exakt dem Buchungsbetrag entsprechen.')
     with connect(db) as c:
+        payment = d.get('payment_method')
+        if 'payment_method' in d:
+            if not isinstance(payment, str) or payment and not c.execute('SELECT 1 FROM payment_methods WHERE name=?', (payment,)).fetchone():
+                raise ValueError('Unbekanntes Zahlungsmittel.')
         group_name = d.get('group_name')
         if 'group_name' in d:
             if not isinstance(group_name, str) or len(group_name.strip()) > 80:
@@ -79,15 +91,18 @@ def save_transaction(d, db=None):
             group_name = group_name.strip()
         if d.get('id'):
             txid = int(d['id'])
-            existing = c.execute('SELECT group_name FROM transactions WHERE id=?',(txid,)).fetchone()
+            existing = c.execute('SELECT group_name,payment_method FROM transactions WHERE id=?',(txid,)).fetchone()
             if not existing: raise ValueError('Buchung nicht gefunden.')
             if 'group_name' not in d:
                 group_name = existing['group_name']
+            if 'payment_method' not in d:
+                payment = existing['payment_method']
             c.execute('UPDATE transactions SET date=?,merchant=?,amount=?,category=? WHERE id=?',(date,merchant,amount,d['category'],txid))
             c.execute('DELETE FROM items WHERE transaction_id=?',(txid,))
         else:
             txid = c.execute('INSERT INTO transactions(date,merchant,amount,category) VALUES (?,?,?,?)',(date,merchant,amount,d['category'])).lastrowid
         c.execute('UPDATE transactions SET group_name=? WHERE id=?', (group_name or '', txid))
+        c.execute('UPDATE transactions SET payment_method=? WHERE id=?', (payment or '', txid))
         c.executemany('INSERT INTO items(transaction_id,name,amount,category,group_name) VALUES (?,?,?,?,?)',[(txid,*x) for x in converted])
     return {'id': txid}
 
@@ -106,10 +121,33 @@ def import_csv(d, db=None):
             prepared.append((date,merchant,amount,'Unkategorisiert',key))
         except (ValueError, KeyError, TypeError) as e: raise ValueError(f'CSV-Zeile {index}: {e}')
     with connect(db) as c:
+        payment = d.get('payment_method', '')
+        if not isinstance(payment, str) or payment and not c.execute('SELECT 1 FROM payment_methods WHERE name=?', (payment,)).fetchone():
+            raise ValueError('Unbekanntes Zahlungsmittel.')
+        category = c.execute("SELECT name FROM category_aliases WHERE alias='Unkategorisiert'").fetchone()[0]
+        prepared = [(date,merchant,amount,category,key,payment) for date,merchant,amount,_,key in prepared]
         before = c.total_changes
-        c.executemany('INSERT OR IGNORE INTO transactions(date,merchant,amount,category,import_key) VALUES (?,?,?,?,?)',prepared)
+        c.executemany('INSERT OR IGNORE INTO transactions(date,merchant,amount,category,import_key,payment_method) VALUES (?,?,?,?,?,?)',prepared)
         added = c.total_changes-before
     return {'added':added,'skipped':len(prepared)-added}
+
+def rename_category(old, new, db=None):
+    if not isinstance(old, str) or not isinstance(new, str) or not new.strip() or len(new.strip()) > 60:
+        raise ValueError('Kategorie muss 1–60 Zeichen enthalten.')
+    new = new.strip()
+    with connect(db) as con:
+        if not con.execute('SELECT 1 FROM categories WHERE name=?', (old,)).fetchone():
+            raise ValueError('Kategorie nicht gefunden.')
+        if old == new:
+            return {'ok': True}
+        if con.execute('SELECT 1 FROM categories WHERE name=?', (new,)).fetchone():
+            raise ValueError('Dieser Kategoriename ist bereits vergeben.')
+        con.execute('INSERT INTO categories VALUES (?)', (new,))
+        con.execute('UPDATE transactions SET category=? WHERE category=?', (new, old))
+        con.execute('UPDATE items SET category=? WHERE category=?', (new, old))
+        con.execute('UPDATE category_aliases SET name=? WHERE name=?', (new, old))
+        con.execute('DELETE FROM categories WHERE name=?', (old,))
+    return {'ok': True}
 
 def recognize(d):
     from receipts import recognize_text

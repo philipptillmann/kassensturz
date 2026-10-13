@@ -1654,5 +1654,32 @@
     "amount": "-30.00",
     "category": "Shopping",
     "group_name": "Gemeinsames Geschenk"
+  },
+  {
+    "seed_group": "payments-v1",
+    "month_offset": 0,
+    "day": 13,
+    "merchant": "Demo · Kaffee bar",
+    "amount": "8.50",
+    "category": "Freizeit",
+    "payment_method": "Bar"
+  },
+  {
+    "seed_group": "payments-v1",
+    "month_offset": 0,
+    "day": 13,
+    "merchant": "Demo · Onlinekauf PayPal",
+    "amount": "24.90",
+    "category": "Shopping",
+    "payment_method": "PayPal"
+  },
+  {
+    "seed_group": "payments-v1",
+    "month_offset": 0,
+    "day": 13,
+    "merchant": "Demo · Bankkartenzahlung",
+    "amount": "45.00",
+    "category": "Lebensmittel",
+    "payment_method": "Demo-Bank"
   }
 ]

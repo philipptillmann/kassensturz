@@ -13,6 +13,7 @@ def prepare_demo(db):
         con.execute('CREATE TABLE IF NOT EXISTS dataset_meta(key TEXT PRIMARY KEY)')
         seeded = {row[0] for row in con.execute('SELECT key FROM dataset_meta')}
         groups = set()
+        aliases = dict(con.execute('SELECT alias,name FROM category_aliases'))
         # The seed and marker are one transaction, so a restart cannot duplicate data.
         for sample in samples:
             group = 'seeded' if not sample.get('seed_group') else 'seeded-' + sample['seed_group']
@@ -26,9 +27,12 @@ def prepare_demo(db):
             amount = ledger.cents(sample['amount'])
             if items and sum(ledger.cents(item['amount']) for item in items) != amount:
                 raise ValueError('Invalid demo split')
+            payment = sample.get('payment_method', '')
+            if payment:
+                con.execute('INSERT OR IGNORE INTO payment_methods VALUES (?)', (payment,))
             txid = con.execute(
-                'INSERT INTO transactions(date,merchant,amount,category,group_name) VALUES (?,?,?,?,?)',
-                (date, sample['merchant'], amount, sample['category'], sample.get('group_name', ''))).lastrowid
+                'INSERT INTO transactions(date,merchant,amount,category,group_name,payment_method) VALUES (?,?,?,?,?,?)',
+                (date, sample['merchant'], amount, aliases.get(sample['category'], sample['category']), sample.get('group_name', ''), payment)).lastrowid
             con.executemany('INSERT INTO items(transaction_id,name,amount,category,group_name) VALUES (?,?,?,?,?)',
-                            [(txid, item['name'], ledger.cents(item['amount']), item['category'], item.get('group_name')) for item in items])
+                            [(txid, item['name'], ledger.cents(item['amount']), aliases.get(item['category'], item['category']), item.get('group_name')) for item in items])
         con.executemany('INSERT INTO dataset_meta VALUES (?)', [(group,) for group in sorted(groups)])
