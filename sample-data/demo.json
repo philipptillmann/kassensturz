@@ -1681,5 +1681,159 @@
     "amount": "45.00",
     "category": "Lebensmittel",
     "payment_method": "Demo-Bank"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": 0,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": -1,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": -2,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": -3,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": -4,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": -5,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": -6,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": -7,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": -8,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": -9,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": -10,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": -11,
+    "day": 1,
+    "merchant": "Demo · Gehalt",
+    "amount": "-2800.00",
+    "category": "Gehalt",
+    "payment_method": "Demo-Bank",
+    "kind": "income",
+    "notes": "Monatliches Gehalt"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": 0,
+    "day": 12,
+    "merchant": "Demo · Geldgeschenk",
+    "amount": "-100.00",
+    "category": "Geschenke",
+    "payment_method": "Bar",
+    "kind": "income",
+    "notes": "Zum Geburtstag erhalten"
+  },
+  {
+    "seed_group": "income-v1",
+    "month_offset": 0,
+    "day": 12,
+    "merchant": "Demo · Nebenverdienst",
+    "amount": "-75.00",
+    "category": "Sonstige Einnahmen",
+    "payment_method": "PayPal",
+    "kind": "income",
+    "notes": "Einmaliger Nebenverdienst"
   }
 ]

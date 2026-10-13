@@ -269,6 +269,29 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.post('/api/category-rename',{'old_name':'Rad','name':'Shopping'},csrf).status_code,400)
         self.assertEqual(self.post('/api/payment-method',{'name':''},csrf).status_code,400)
 
+    def test_income_persists_and_is_exported_without_changing_refunds(self):
+        csrf=self.login()
+        salary={'merchant':'Employer','date':'2026-10-01','amount':'2800','kind':'income','category':'Gehalt','payment_method':'Bar'}
+        self.assertEqual(self.post('/api/transaction',salary,csrf).status_code,200)
+        self.post('/api/transaction',{'merchant':'Refund','date':'2026-10-02','amount':'-20','category':'Shopping'},csrf)
+        restarted=create_app(password=PASSWORD,public_url='').test_client();self.login(restarted)
+        data=restarted.get('/api/data').json['transactions']
+        self.assertEqual([(t['kind'],t['amount']) for t in data],[('expense',-2000),('income',-280000)])
+        self.assertIn('Buchungstyp',restarted.get('/api/export').get_data(as_text=True))
+        self.assertIn('Einnahme',restarted.get('/api/export').get_data(as_text=True))
+
+    def test_notes_persist_export_and_stay_in_their_dataset(self):
+        csrf=self.login()
+        notes='=SUM(1;2)\nPersönliche Notiz <script>nur Text</script>'
+        data={'merchant':'Test','date':'2026-10-01','amount':'10','category':'Shopping','notes':notes}
+        self.assertEqual(self.post('/api/transaction',data,csrf).status_code,200)
+        restarted=create_app(password=PASSWORD,public_url='').test_client();self.login(restarted)
+        self.assertEqual(restarted.get('/api/data').json['transactions'][0]['notes'],notes)
+        import csv
+        rows=list(csv.reader(io.StringIO(restarted.get('/api/export').get_data(as_text=True)),delimiter=';'))
+        self.assertEqual(rows[1][rows[0].index('Notizen')],"'"+notes)
+        self.assertNotIn(notes,[tx['notes'] for tx in self.client.get('/api/data?dataset=demo').json['transactions']])
+
     def test_home_screen_assets_are_available_before_login(self):
         manifest = self.client.get('/manifest.webmanifest')
         self.assertEqual(manifest.status_code, 200)

@@ -162,6 +162,25 @@ importierten Buchungen ausgewählt werden; übersprungene Duplikate bleiben
 unverändert. Zahlungsmittel erscheinen in der Buchungsliste, Gruppenansicht und
 im CSV-Export. Beide Datensätze haben eigene Listen und Zuordnungen.
 
+### Einnahmen
+
+Beim Erfassen „Buchungstyp → Einnahme“ wählen und den Betrag positiv eingeben.
+Kategorien für Gehalt, Geschenke und sonstige Einnahmen sind vorbereitet und
+können umbenannt oder ergänzt werden. Einnahmen haben ein eigenes Monatstotal und
+eine eigene Auswahl in den Diagrammen. Sie reduzieren keine Ausgaben oder
+Ausgabengruppen. Erstattungen und Kostenbeiträge bleiben „Ausgabe / Erstattung“
+mit negativem Betrag. Bestehende Buchungen behalten diese bisherige Bedeutung;
+importiertes Gehalt kann nachträglich auf Einnahme umgestellt werden. CSV-Exporte
+enthalten den Buchungstyp; intern behalten eingehende Beträge das negative Vorzeichen.
+
+### Notizen
+
+Jede Buchung hat ein optionales Freitextfeld mit bis zu 4000 Zeichen. Notizen
+lassen sich später bearbeiten oder löschen, werden durchsucht und als Text im
+CSV-Export mitgeführt. Die Liste zeigt eine kurze Vorschau; die vollständige
+Notiz steht im Buchungseditor. Notizen gehören zur ursprünglichen Buchung,
+auch bei einer Rechnung mit mehreren Positionen oder Gruppen.
+
 ## Betrieb und Daten
 
 ### Updates per SSH / Termius

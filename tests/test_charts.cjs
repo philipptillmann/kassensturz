@@ -64,3 +64,10 @@ assert.equal(monthView([noGroups],'2026-10',true).length,1);assert.equal(monthVi
 const inherit={...mixed[0],group_name:'Whole receipt',items:mixed[0].items.map(i=>({...i,group_name:null}))};
 assert.equal(monthView([inherit],'2026-10',true)[0].amount,15000);assert.equal(monthView([inherit],'2026-10',true)[0].members.length,1);
 console.log('Receipt group checks passed: partial grouping, multiple groups, inheritance, explicit opt-out, and no double counting.');
+const salary={id:50,date:'2026-10-01',merchant:'Salary',amount:-280000,kind:'income',category:'Gehalt',group_name:'Gift',items:[]};
+let incomeReport=aggregate([...gift,salary],{from:'2026-10',to:'2026-10'});
+assert.equal(incomeReport.income,280000);assert.equal(incomeReport.expenses,14500);assert.equal(incomeReport.credits,7000);assert.equal(incomeReport.net,7500);
+assert.equal(aggregate([...gift,salary],{from:'2026-10',to:'2026-10',metric:'income'}).monthly[0][1],280000);
+assert.equal(aggregate([salary],{from:'2026-10',to:'2026-10',category:'Shopping',metric:'income'}).income,0);
+const salaryView=monthView([...gift,salary],'2026-10',true);assert.equal(salaryView.find(t=>t.members).amount,5000);assert.equal(salaryView.find(t=>t.kind==='income').amount,-280000);
+console.log('Income checks passed: separate income totals/charts and no offset against expenses or groups.');

@@ -93,4 +93,24 @@ class LedgerTests(unittest.TestCase):
         with self.assertRaises(ValueError):app.save_transaction(d)
         d['payment_method']='';app.save_transaction(d)
         with app.connect() as con:self.assertEqual(con.execute('SELECT payment_method FROM transactions').fetchone()[0],'')
+    def test_income_is_normalized_and_keeps_its_type_on_legacy_edit(self):
+        d={'date':'2026-10-01','merchant':'Employer','amount':'2800','kind':'income','category':'Gehalt','payment_method':'PayPal','items':[{'name':'Salary','amount':'2800','category':'Gehalt'}]}
+        d['id']=app.save_transaction(d)['id']
+        with app.connect() as con:
+            self.assertEqual(tuple(con.execute('SELECT amount,kind FROM transactions').fetchone()),(-280000,'income'))
+            self.assertEqual(con.execute('SELECT amount FROM items').fetchone()[0],-280000)
+        del d['kind'];app.save_transaction(d)
+        with app.connect() as con:self.assertEqual(con.execute('SELECT kind FROM transactions').fetchone()[0],'income')
+        d['kind']='invalid'
+        with self.assertRaises(ValueError):app.save_transaction(d)
+        d['kind']='expense';d['items']=[];app.save_transaction(d)
+        with app.connect() as con:self.assertEqual(tuple(con.execute('SELECT amount,kind FROM transactions').fetchone()),(280000,'expense'))
+    def test_notes_preserve_text_and_legacy_edits_and_can_be_cleared(self):
+        d=self.transaction();d['notes']='Bonus\n<p>Nur Text</p>';d['id']=app.save_transaction(d)['id']
+        del d['notes'];app.save_transaction(d)
+        with app.connect() as con:self.assertEqual(con.execute('SELECT notes FROM transactions').fetchone()[0],'Bonus\n<p>Nur Text</p>')
+        d['notes']='x'*4001
+        with self.assertRaises(ValueError):app.save_transaction(d)
+        d['notes']='';app.save_transaction(d)
+        with app.connect() as con:self.assertEqual(con.execute('SELECT notes FROM transactions').fetchone()[0],'')
 if __name__=='__main__':unittest.main()

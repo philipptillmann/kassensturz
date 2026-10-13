@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DB = Path(os.environ.get('DATA_DIR', str(ROOT / 'data'))) / 'expenses.sqlite3'
-CATEGORIES = ['Unkategorisiert', 'Lebensmittel', 'Wohnen', 'Küche & Haushalt', 'Fahrrad', 'Mobilität', 'Shopping', 'Freizeit', 'Gesundheit', 'Abos', 'Reisen']
+CATEGORIES = ['Unkategorisiert', 'Lebensmittel', 'Wohnen', 'Küche & Haushalt', 'Fahrrad', 'Mobilität', 'Shopping', 'Freizeit', 'Gesundheit', 'Abos', 'Reisen', 'Gehalt', 'Geschenke', 'Sonstige Einnahmen']
 
 def connect(db=None):
     con = sqlite3.connect(DB if db is None else db, timeout=15)
@@ -32,6 +32,10 @@ def init(db=None):
             c.execute('ALTER TABLE items ADD COLUMN group_name TEXT DEFAULT NULL')
         if 'payment_method' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
             c.execute("ALTER TABLE transactions ADD COLUMN payment_method TEXT NOT NULL DEFAULT ''")
+        if 'kind' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
+            c.execute("ALTER TABLE transactions ADD COLUMN kind TEXT NOT NULL DEFAULT 'expense'")
+        if 'notes' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
+            c.execute("ALTER TABLE transactions ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
         for name in CATEGORIES:
             if not c.execute('SELECT 1 FROM category_aliases WHERE alias=?', (name,)).fetchone():
                 c.execute('INSERT OR IGNORE INTO categories VALUES (?)', (name,))
@@ -63,7 +67,17 @@ def read_csv(text):
     return reader.fieldnames, rows
 
 def save_transaction(d, db=None):
+    kind = d.get('kind', 'expense')
+    if d.get('id') and 'kind' not in d:
+        with connect(db) as con:
+            row = con.execute('SELECT kind FROM transactions WHERE id=?', (int(d['id']),)).fetchone()
+            if row:
+                kind = row['kind']
+    if kind not in ('expense', 'income'):
+        raise ValueError('Unbekannter Buchungstyp.')
     amount = cents(d['amount'])
+    if kind == 'income':
+        amount = -abs(amount)
     merchant = str(d['merchant']).strip()
     if not merchant: raise ValueError('Bitte einen Händler eingeben.')
     date = date_value(d['date'])
@@ -75,11 +89,17 @@ def save_transaction(d, db=None):
             if not isinstance(group, str) or len(group.strip()) > 80:
                 raise ValueError('Gruppenname muss höchstens 80 Zeichen enthalten.')
             group = group.strip()
-        converted.append((str(item['name']).strip(), cents(item['amount']), item['category'], group))
+        item_amount = cents(item['amount'])
+        if kind == 'income':
+            item_amount = -abs(item_amount)
+        converted.append((str(item['name']).strip(), item_amount, item['category'], group))
     if any(not x[0] for x in converted): raise ValueError('Jede Position benötigt einen Namen.')
     if converted and sum(x[1] for x in converted) != amount:
         raise ValueError('Die Summe der Positionen muss exakt dem Buchungsbetrag entsprechen.')
     with connect(db) as c:
+        notes = d.get('notes')
+        if 'notes' in d and (not isinstance(notes, str) or len(notes) > 4000):
+            raise ValueError('Notizen dürfen höchstens 4000 Zeichen enthalten.')
         payment = d.get('payment_method')
         if 'payment_method' in d:
             if not isinstance(payment, str) or payment and not c.execute('SELECT 1 FROM payment_methods WHERE name=?', (payment,)).fetchone():
@@ -91,18 +111,22 @@ def save_transaction(d, db=None):
             group_name = group_name.strip()
         if d.get('id'):
             txid = int(d['id'])
-            existing = c.execute('SELECT group_name,payment_method FROM transactions WHERE id=?',(txid,)).fetchone()
+            existing = c.execute('SELECT group_name,payment_method,notes FROM transactions WHERE id=?',(txid,)).fetchone()
             if not existing: raise ValueError('Buchung nicht gefunden.')
             if 'group_name' not in d:
                 group_name = existing['group_name']
             if 'payment_method' not in d:
                 payment = existing['payment_method']
+            if 'notes' not in d:
+                notes = existing['notes']
             c.execute('UPDATE transactions SET date=?,merchant=?,amount=?,category=? WHERE id=?',(date,merchant,amount,d['category'],txid))
             c.execute('DELETE FROM items WHERE transaction_id=?',(txid,))
         else:
             txid = c.execute('INSERT INTO transactions(date,merchant,amount,category) VALUES (?,?,?,?)',(date,merchant,amount,d['category'])).lastrowid
         c.execute('UPDATE transactions SET group_name=? WHERE id=?', (group_name or '', txid))
         c.execute('UPDATE transactions SET payment_method=? WHERE id=?', (payment or '', txid))
+        c.execute('UPDATE transactions SET kind=? WHERE id=?', (kind, txid))
+        c.execute('UPDATE transactions SET notes=? WHERE id=?', (notes or '', txid))
         c.executemany('INSERT INTO items(transaction_id,name,amount,category,group_name) VALUES (?,?,?,?,?)',[(txid,*x) for x in converted])
     return {'id': txid}
 

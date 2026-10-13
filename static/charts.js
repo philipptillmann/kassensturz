@@ -12,8 +12,9 @@
     const selected=transactions.filter(tx=>!month||tx.date.startsWith(month));
     if(!effective)return selected;
     const parts=tx=>tx.items.length&&tx.items.some(item=>item.group_name!=null)?tx.items.map((item,index)=>({...tx,id:'item:'+tx.id+':'+(item.id??index),source_id:tx.id,part_index:index,item_name:item.name,merchant:tx.merchant+' · '+item.name,amount:item.amount,category:item.category,group_name:item.group_name==null?tx.group_name:item.group_name,items:[]})):[{...tx,source_id:tx.id}];
-    const allParts=transactions.flatMap(parts),selectedParts=selected.flatMap(tx=>{
+    const allParts=transactions.filter(tx=>tx.kind!=='income').flatMap(parts),selectedParts=selected.flatMap(tx=>{
       // Unsplit and ungrouped receipts remain one original row.
+      if(tx.kind==='income')return [tx];
       const entries=parts(tx);return entries.some(part=>part.group_name)?entries:[{...tx,group_name:''}];
     });
     const anchors=new Map();
@@ -22,7 +23,7 @@
     });
     const groups=new Map(),rows=[];
     for(const tx of selectedParts){
-      if(!tx.group_name){rows.push(tx);continue}
+      if(tx.kind==='income'||!tx.group_name){rows.push(tx);continue}
       if(!groups.has(tx.group_name)){
         const anchor=anchors.get(tx.group_name),group={id:'group:'+tx.group_name,group_name:tx.group_name,merchant:tx.group_name,date:tx.date,amount:0,category:anchor.category,items:[],members:[]};
         groups.set(tx.group_name,group);rows.push(group);
@@ -33,13 +34,13 @@
   }
   function aggregate(transactions,{from,to,category='',metric='expenses'}){
     const months=monthsBetween(from,to),monthly=new Map(months.map(m=>[m,0])),categories=new Map(),merchants=new Map(),series=new Map();
-    let expenses=0,credits=0;
+    let expenses=0,credits=0,income=0;
     for(const tx of transactions){
       const month=tx.date.slice(0,7);if(!monthly.has(month))continue;
       for(const item of tx.items.length?tx.items:[tx]){
         if(category&&item.category!==category)continue;
-        expenses+=Math.max(item.amount,0);credits+=Math.max(-item.amount,0);
-        const value=metric==='credits'?Math.max(-item.amount,0):metric==='net'?item.amount:Math.max(item.amount,0);
+        if(tx.kind==='income')income+=Math.max(-item.amount,0);else{expenses+=Math.max(item.amount,0);credits+=Math.max(-item.amount,0);}
+        const value=metric==='income'?(tx.kind==='income'?Math.max(-item.amount,0):0):tx.kind==='income'?0:metric==='credits'?Math.max(-item.amount,0):metric==='net'?item.amount:Math.max(item.amount,0);
         monthly.set(month,monthly.get(month)+value);
         categories.set(item.category,(categories.get(item.category)||0)+value);
         merchants.set(tx.merchant,(merchants.get(tx.merchant)||0)+value);
@@ -49,7 +50,7 @@
     }
     const ranked=map=>[...map].filter(([,value])=>value!==0).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])||a[0].localeCompare(b[0],'de'));
     const categoryRows=ranked(categories);
-    return {months,monthly:[...monthly],categories:categoryRows,merchants:ranked(merchants),series:categoryRows.slice(0,5).map(([name])=>({name,values:[...series.get(name)]})),expenses,credits,net:expenses-credits};
+    return {months,monthly:[...monthly],categories:categoryRows,merchants:ranked(merchants),series:categoryRows.slice(0,5).map(([name])=>({name,values:[...series.get(name)]})),expenses,credits,income,net:expenses-credits};
   }
   root.KassensturzReports={monthsBetween,aggregate,monthView};
   if(typeof module!=='undefined')module.exports=root.KassensturzReports;

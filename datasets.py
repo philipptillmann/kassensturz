@@ -31,8 +31,8 @@ def prepare_demo(db):
             if payment:
                 con.execute('INSERT OR IGNORE INTO payment_methods VALUES (?)', (payment,))
             txid = con.execute(
-                'INSERT INTO transactions(date,merchant,amount,category,group_name,payment_method) VALUES (?,?,?,?,?,?)',
-                (date, sample['merchant'], amount, aliases.get(sample['category'], sample['category']), sample.get('group_name', ''), payment)).lastrowid
+                'INSERT INTO transactions(date,merchant,amount,category,group_name,payment_method,kind,notes) VALUES (?,?,?,?,?,?,?,?)',
+                (date, sample['merchant'], amount, aliases.get(sample['category'], sample['category']), sample.get('group_name', ''), payment, sample.get('kind', 'expense'), sample.get('notes', ''))).lastrowid
             con.executemany('INSERT INTO items(transaction_id,name,amount,category,group_name) VALUES (?,?,?,?,?)',
                             [(txid, item['name'], ledger.cents(item['amount']), aliases.get(item['category'], item['category']), item.get('group_name')) for item in items])
         con.executemany('INSERT INTO dataset_meta VALUES (?)', [(group,) for group in sorted(groups)])
