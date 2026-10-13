@@ -8,6 +8,24 @@
     if(end-start>239)return [];
     return Array.from({length:end-start+1},(_,i)=>`${Math.floor((start+i)/12)}-${String((start+i)%12+1).padStart(2,'0')}`);
   }
+  function monthView(transactions,month,effective=false){
+    const selected=transactions.filter(tx=>!month||tx.date.startsWith(month));
+    if(!effective)return selected;
+    const anchors=new Map();
+    [...transactions].sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id).forEach(tx=>{
+      if(tx.group_name&&(!anchors.has(tx.group_name)||anchors.get(tx.group_name).amount<=0&&tx.amount>0))anchors.set(tx.group_name,tx);
+    });
+    const groups=new Map(),rows=[];
+    for(const tx of selected){
+      if(!tx.group_name){rows.push(tx);continue}
+      if(!groups.has(tx.group_name)){
+        const anchor=anchors.get(tx.group_name),group={id:'group:'+tx.group_name,group_name:tx.group_name,merchant:tx.group_name,date:tx.date,amount:0,category:anchor.category,items:[],members:[]};
+        groups.set(tx.group_name,group);rows.push(group);
+      }
+      const group=groups.get(tx.group_name);group.amount+=tx.amount;group.members.push(tx);if(tx.date<group.date)group.date=tx.date;
+    }
+    return rows.sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id)));
+  }
   function aggregate(transactions,{from,to,category='',metric='expenses'}){
     const months=monthsBetween(from,to),monthly=new Map(months.map(m=>[m,0])),categories=new Map(),merchants=new Map(),series=new Map();
     let expenses=0,credits=0;
@@ -28,6 +46,6 @@
     const categoryRows=ranked(categories);
     return {months,monthly:[...monthly],categories:categoryRows,merchants:ranked(merchants),series:categoryRows.slice(0,5).map(([name])=>({name,values:[...series.get(name)]})),expenses,credits,net:expenses-credits};
   }
-  root.KassensturzReports={monthsBetween,aggregate};
+  root.KassensturzReports={monthsBetween,aggregate,monthView};
   if(typeof module!=='undefined')module.exports=root.KassensturzReports;
 })(typeof window==='undefined'?globalThis:window);

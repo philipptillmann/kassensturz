@@ -27,8 +27,8 @@ def prepare_demo(db):
             if items and sum(ledger.cents(item['amount']) for item in items) != amount:
                 raise ValueError('Invalid demo split')
             txid = con.execute(
-                'INSERT INTO transactions(date,merchant,amount,category) VALUES (?,?,?,?)',
-                (date, sample['merchant'], amount, sample['category'])).lastrowid
+                'INSERT INTO transactions(date,merchant,amount,category,group_name) VALUES (?,?,?,?,?)',
+                (date, sample['merchant'], amount, sample['category'], sample.get('group_name', ''))).lastrowid
             con.executemany('INSERT INTO items(transaction_id,name,amount,category) VALUES (?,?,?,?)',
                             [(txid, item['name'], ledger.cents(item['amount']), item['category']) for item in items])
         con.executemany('INSERT INTO dataset_meta VALUES (?)', [(group,) for group in sorted(groups)])

@@ -36,4 +36,27 @@ class LedgerTests(unittest.TestCase):
         d=self.transaction(); d['items'][0]['category']='missing'
         with self.assertRaises(Exception): app.save_transaction(d)
         with app.connect() as c: self.assertEqual(c.execute('SELECT COUNT(*) FROM transactions').fetchone()[0],0)
+    def test_groups_preserve_individual_transactions_and_can_be_removed(self):
+        d=self.transaction();d['group_name']='  Geschenk  '
+        tx=app.save_transaction(d);d['id']=tx['id']
+        with app.connect() as c:
+            self.assertEqual(c.execute('SELECT group_name FROM transactions').fetchone()[0],'Geschenk')
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM items').fetchone()[0],2)
+        del d['group_name'];app.save_transaction(d)
+        with app.connect() as c:self.assertEqual(c.execute('SELECT group_name FROM transactions').fetchone()[0],'Geschenk')
+        d['group_name']='x'*81
+        with self.assertRaises(ValueError):app.save_transaction(d)
+        d['group_name']='';app.save_transaction(d)
+        with app.connect() as c:
+            row=c.execute('SELECT * FROM transactions').fetchone()
+            self.assertEqual(row['group_name'],'');self.assertEqual(row['amount'],5000)
+    def test_group_migration_keeps_existing_data(self):
+        import sqlite3
+        old=Path(self.tmp.name)/'old.sqlite3'
+        with sqlite3.connect(old) as con:
+            con.executescript("CREATE TABLE categories(name TEXT PRIMARY KEY); INSERT INTO categories VALUES ('Shopping'); CREATE TABLE transactions(id INTEGER PRIMARY KEY,date TEXT NOT NULL,merchant TEXT NOT NULL,amount INTEGER NOT NULL,category TEXT NOT NULL REFERENCES categories(name),import_key TEXT UNIQUE); INSERT INTO transactions VALUES (1,'2026-10-01','Existing expense',12000,'Shopping','keep-import-key');")
+        app.init(old);app.init(old)
+        with app.connect(old) as con:
+            row=con.execute('SELECT * FROM transactions').fetchone()
+            self.assertEqual((row['amount'],row['import_key'],row['group_name']),(12000,'keep-import-key',''))
 if __name__=='__main__':unittest.main()

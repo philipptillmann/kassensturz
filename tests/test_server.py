@@ -213,6 +213,25 @@ class ServerTests(unittest.TestCase):
         private = restarted.get('/api/data').json['transactions']
         self.assertEqual([(t['merchant'], t['amount']) for t in private], [('Existing expense', 4200)])
 
+    def test_group_names_persist_export_and_are_isolated_by_dataset(self):
+        csrf=self.login()
+        data={'merchant':'Gift','date':'2026-10-01','amount':'120','category':'Shopping','group_name':'Gift group'}
+        purchase=self.post('/api/transaction',data,csrf).json['id']
+        data.update(merchant='Cash contribution',amount='-30')
+        self.post('/api/transaction',data,csrf)
+        private=self.client.get('/api/data').json['transactions']
+        self.assertEqual(len(private),2)
+        self.assertEqual({t['group_name'] for t in private},{'Gift group'})
+        self.assertEqual(sum(t['amount'] for t in private),9000)
+        self.assertNotIn('Gift group',{t['group_name'] for t in self.client.get('/api/data?dataset=demo').json['transactions']})
+        self.assertIn('Gift group',self.client.get('/api/export').get_data(as_text=True))
+        self.assertNotIn('Gift group',self.client.get('/api/export?dataset=demo').get_data(as_text=True))
+        restarted=create_app(password=PASSWORD,public_url='').test_client();self.login(restarted)
+        self.assertEqual({t['group_name'] for t in restarted.get('/api/data').json['transactions']},{'Gift group'})
+        self.post('/api/delete',{'id':purchase},csrf)
+        remaining=self.client.get('/api/data').json['transactions']
+        self.assertEqual([(t['merchant'],t['amount']) for t in remaining],[('Cash contribution',-3000)])
+
     def test_home_screen_assets_are_available_before_login(self):
         manifest = self.client.get('/manifest.webmanifest')
         self.assertEqual(manifest.status_code, 200)

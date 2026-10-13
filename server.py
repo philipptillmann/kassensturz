@@ -221,7 +221,7 @@ def create_app(password=None, public_url=None):
     def export():
         out = io.StringIO()
         writer = csv.writer(out, delimiter=';')
-        writer.writerow(['Datum', 'Händler', 'Betrag EUR', 'Kategorie', 'Position'])
+        writer.writerow(['Datum', 'Händler', 'Betrag EUR', 'Kategorie', 'Position', 'Gruppe'])
         def safe(value):
             return "'" + value if value.startswith(('=', '+', '-', '@', '\t', '\r')) else value
         with data_connect() as con:
@@ -230,7 +230,7 @@ def create_app(password=None, public_url=None):
                 for item in items or [transaction]:
                     writer.writerow([transaction['date'], safe(transaction['merchant']),
                                      f"{item['amount'] / 100:.2f}".replace('.', ','), safe(item['category']),
-                                     safe(item['name']) if items else ''])
+                                     safe(item['name']) if items else '', safe(transaction['group_name'])])
         response = make_response(('\ufeff' + out.getvalue()).encode())
         response.headers['Content-Type'] = 'text/csv; charset=utf-8'
         response.headers['Content-Disposition'] = f'attachment; filename=kassensturz-{g.dataset}.csv'

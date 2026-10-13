@@ -21,3 +21,24 @@ for(const [from,to] of [['2026-02','2026-01'],['2026-13','2027-01'],['2000-01','
 assert.deepEqual(aggregate([] ,options).monthly,[['2026-01',0],['2026-02',0],['2026-03',0]]);
 assert.equal(aggregate([{date:'2026-01-01',merchant:'__proto__',amount:100,category:'__proto__',items:[]}],options).categories[0][1],100);
 console.log('Chart checks passed: splits, refunds, filters, empty months, year boundaries, and invalid ranges.');
+const {monthView}=require('../static/charts.js');
+const gift=[
+ {id:1,date:'2026-10-01',merchant:'Amazon',amount:12000,category:'Shopping',group_name:'Gift',items:[{amount:12000,category:'Shopping'}]},
+ {id:2,date:'2026-10-02',merchant:'Cash',amount:-3000,category:'Unkategorisiert',group_name:'Gift',items:[]},
+ {id:3,date:'2026-10-03',merchant:'PayPal',amount:-4000,category:'Unkategorisiert',group_name:'Gift',items:[]},
+ {id:4,date:'2026-11-01',merchant:'Later contribution',amount:-1000,category:'Unkategorisiert',group_name:'Gift',items:[]},
+ {id:5,date:'2026-10-05',merchant:'Groceries',amount:2500,category:'Lebensmittel',group_name:'',items:[]}
+];
+const snapshot=JSON.stringify(gift);
+assert.equal(monthView(gift,'2026-10',false).length,4);
+let grouped=monthView(gift,'2026-10',true);assert.equal(grouped.length,2);
+let group=grouped.find(t=>t.members);assert.equal(group.amount,5000);assert.equal(group.members.length,3);assert.equal(group.category,'Shopping');assert.equal(group.merchant,'Gift');
+assert.equal(grouped.reduce((n,t)=>n+Math.max(t.amount,0),0),7500);
+assert.equal(monthView(gift,'2026-11',true)[0].amount,-1000);assert.equal(monthView(gift,'2026-11',true)[0].category,'Shopping');
+assert.equal(monthView(gift,'',true).find(t=>t.members).amount,4000);
+assert.equal(monthView(gift,'2025-01',true).length,0);
+assert.equal(JSON.stringify(gift),snapshot);
+assert.equal(monthView(gift.map(t=>({...t,group_name:t.group_name==='Gift'?'__proto__':''})),'2026-10',true).find(t=>t.members).amount,5000);
+assert.equal(monthView([{...gift[0],amount:3000,items:[]},gift[1]],'2026-10',true)[0].amount,0);
+assert.equal(monthView([{...gift[0],amount:1000,items:[]},gift[1]],'2026-10',true)[0].amount,-2000);
+console.log('Group checks passed: purchase/contributions, monthly boundaries, category anchoring, zero/negative groups, and original data preserved.');

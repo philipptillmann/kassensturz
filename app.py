@@ -24,6 +24,8 @@ def init(db=None):
         CREATE TABLE IF NOT EXISTS transactions(id INTEGER PRIMARY KEY, date TEXT NOT NULL, merchant TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name), import_key TEXT UNIQUE);
         CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, name TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name));
         ''')
+        if 'group_name' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
+            c.execute("ALTER TABLE transactions ADD COLUMN group_name TEXT NOT NULL DEFAULT ''")
         c.executemany('INSERT OR IGNORE INTO categories VALUES (?)', [(x,) for x in CATEGORIES])
     os.chmod(db, 0o600)
 
@@ -61,13 +63,22 @@ def save_transaction(d, db=None):
     if converted and sum(x[1] for x in converted) != amount:
         raise ValueError('Die Summe der Positionen muss exakt dem Buchungsbetrag entsprechen.')
     with connect(db) as c:
+        group_name = d.get('group_name')
+        if 'group_name' in d:
+            if not isinstance(group_name, str) or len(group_name.strip()) > 80:
+                raise ValueError('Gruppenname muss höchstens 80 Zeichen enthalten.')
+            group_name = group_name.strip()
         if d.get('id'):
             txid = int(d['id'])
-            if not c.execute('SELECT id FROM transactions WHERE id=?',(txid,)).fetchone(): raise ValueError('Buchung nicht gefunden.')
+            existing = c.execute('SELECT group_name FROM transactions WHERE id=?',(txid,)).fetchone()
+            if not existing: raise ValueError('Buchung nicht gefunden.')
+            if 'group_name' not in d:
+                group_name = existing['group_name']
             c.execute('UPDATE transactions SET date=?,merchant=?,amount=?,category=? WHERE id=?',(date,merchant,amount,d['category'],txid))
             c.execute('DELETE FROM items WHERE transaction_id=?',(txid,))
         else:
             txid = c.execute('INSERT INTO transactions(date,merchant,amount,category) VALUES (?,?,?,?)',(date,merchant,amount,d['category'])).lastrowid
+        c.execute('UPDATE transactions SET group_name=? WHERE id=?', (group_name or '', txid))
         c.executemany('INSERT INTO items(transaction_id,name,amount,category) VALUES (?,?,?,?)',[(txid,*x) for x in converted])
     return {'id': txid}
 

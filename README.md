@@ -112,6 +112,27 @@ Rechnungen für bereits importierte Umsätze **an der bestehenden Buchung** erfa
 
 `bank_providers.py` enthält weiterhin die vorbereitete Bankadapter-Schnittstelle. Es ist noch keine Bank direkt angebunden.
 
+### Gruppen und effektive Kosten
+
+In einer Buchung unter „Gruppe“ einen Namen eintragen oder eine vorhandene Gruppe
+wählen. Kauf und Beiträge getrennt erfassen; erhaltene Beiträge sind negative
+Beträge. Zum Beispiel: Amazon 120 €, Beitrag in bar −30 €, PayPal-Beitrag −40 €
+mit dem Gruppennamen „Geburtstagsgeschenk“ ergeben effektiv 50 €.
+
+Die Monatsansicht lässt sich zwischen „Einzelbuchungen“ und „Effektive Kosten“
+umschalten. In der effektiven Ansicht werden die Buchungen einer Gruppe im
+gewählten Monat zu einer Zeile verrechnet; die Monatsbeträge und Kategorieübersicht
+verwenden diese Zeilen. Ungruppierte Buchungen bleiben einzeln sichtbar. Die
+Kategorie einer Gruppe stammt aus ihrer chronologisch ersten positiven Ausgabe.
+Ein Beitrag im Folgemonat bleibt im Folgemonat. Ohne Monatsfilter wird über alle
+Monate verrechnet. Gruppen mit einem Überschuss erscheinen als Gutschrift.
+
+Eine Gruppenzeile öffnen, um ihre Einzelbuchungen zu sehen und zu bearbeiten.
+Ein leeres Gruppenfeld löst eine Buchung wieder aus der Gruppe. Namen gelten
+innerhalb des ausgewählten Datensatzes; gleich geschriebene Namen bilden eine
+Gruppe. Die Einzelbuchungen, CSV-Exporte und Diagramme bleiben erhalten; CSV
+enthält zusätzlich den Gruppennamen. Demo enthält ein entsprechendes Geschenkbeispiel.
+
 ## Betrieb und Daten
 
 ### Updates per SSH / Termius

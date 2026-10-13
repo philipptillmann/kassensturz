@@ -1581,5 +1581,32 @@
     "merchant": "Demo · Streaming",
     "amount": "9.99",
     "category": "Abos"
+  },
+  {
+    "seed_group": "groups-v1",
+    "month_offset": 0,
+    "day": 10,
+    "merchant": "Demo · Amazon-Geschenk",
+    "amount": "120.00",
+    "category": "Shopping",
+    "group_name": "Geburtstagsgeschenk"
+  },
+  {
+    "seed_group": "groups-v1",
+    "month_offset": 0,
+    "day": 11,
+    "merchant": "Demo · Beitrag in bar",
+    "amount": "-30.00",
+    "category": "Shopping",
+    "group_name": "Geburtstagsgeschenk"
+  },
+  {
+    "seed_group": "groups-v1",
+    "month_offset": 0,
+    "day": 12,
+    "merchant": "Demo · PayPal-Beitrag",
+    "amount": "-40.00",
+    "category": "Shopping",
+    "group_name": "Geburtstagsgeschenk"
   }
 ]
