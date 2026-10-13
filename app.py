@@ -26,6 +26,8 @@ def init(db=None):
         ''')
         if 'group_name' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
             c.execute("ALTER TABLE transactions ADD COLUMN group_name TEXT NOT NULL DEFAULT ''")
+        if 'group_name' not in {row['name'] for row in c.execute('PRAGMA table_info(items)')}:
+            c.execute('ALTER TABLE items ADD COLUMN group_name TEXT DEFAULT NULL')
         c.executemany('INSERT OR IGNORE INTO categories VALUES (?)', [(x,) for x in CATEGORIES])
     os.chmod(db, 0o600)
 
@@ -58,7 +60,14 @@ def save_transaction(d, db=None):
     if not merchant: raise ValueError('Bitte einen Händler eingeben.')
     date = date_value(d['date'])
     items = d.get('items', [])
-    converted = [(str(x['name']).strip(), cents(x['amount']), x['category']) for x in items]
+    converted = []
+    for item in items:
+        group = item.get('group_name')
+        if group is not None:
+            if not isinstance(group, str) or len(group.strip()) > 80:
+                raise ValueError('Gruppenname muss höchstens 80 Zeichen enthalten.')
+            group = group.strip()
+        converted.append((str(item['name']).strip(), cents(item['amount']), item['category'], group))
     if any(not x[0] for x in converted): raise ValueError('Jede Position benötigt einen Namen.')
     if converted and sum(x[1] for x in converted) != amount:
         raise ValueError('Die Summe der Positionen muss exakt dem Buchungsbetrag entsprechen.')
@@ -79,7 +88,7 @@ def save_transaction(d, db=None):
         else:
             txid = c.execute('INSERT INTO transactions(date,merchant,amount,category) VALUES (?,?,?,?)',(date,merchant,amount,d['category'])).lastrowid
         c.execute('UPDATE transactions SET group_name=? WHERE id=?', (group_name or '', txid))
-        c.executemany('INSERT INTO items(transaction_id,name,amount,category) VALUES (?,?,?,?)',[(txid,*x) for x in converted])
+        c.executemany('INSERT INTO items(transaction_id,name,amount,category,group_name) VALUES (?,?,?,?,?)',[(txid,*x) for x in converted])
     return {'id': txid}
 
 def import_csv(d, db=None):

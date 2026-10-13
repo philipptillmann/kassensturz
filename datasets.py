@@ -29,6 +29,6 @@ def prepare_demo(db):
             txid = con.execute(
                 'INSERT INTO transactions(date,merchant,amount,category,group_name) VALUES (?,?,?,?,?)',
                 (date, sample['merchant'], amount, sample['category'], sample.get('group_name', ''))).lastrowid
-            con.executemany('INSERT INTO items(transaction_id,name,amount,category) VALUES (?,?,?,?)',
-                            [(txid, item['name'], ledger.cents(item['amount']), item['category']) for item in items])
+            con.executemany('INSERT INTO items(transaction_id,name,amount,category,group_name) VALUES (?,?,?,?,?)',
+                            [(txid, item['name'], ledger.cents(item['amount']), item['category'], item.get('group_name')) for item in items])
         con.executemany('INSERT INTO dataset_meta VALUES (?)', [(group,) for group in sorted(groups)])

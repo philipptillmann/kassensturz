@@ -59,4 +59,16 @@ class LedgerTests(unittest.TestCase):
         with app.connect(old) as con:
             row=con.execute('SELECT * FROM transactions').fetchone()
             self.assertEqual((row['amount'],row['import_key'],row['group_name']),(12000,'keep-import-key',''))
+    def test_item_groups_save_inherit_and_validate_atomically(self):
+        d=self.transaction();d['group_name']='Whole receipt'
+        d['items'][0]['group_name']='  Gift  ';d['items'][1]['group_name']=''
+        tx=app.save_transaction(d);d['id']=tx['id']
+        with app.connect() as con:
+            self.assertEqual([row[0] for row in con.execute('SELECT group_name FROM items ORDER BY id')],['Gift',''])
+            self.assertEqual(con.execute('SELECT amount FROM transactions').fetchone()[0],5000)
+        d['items'][1]['group_name']='x'*81
+        with self.assertRaises(ValueError):app.save_transaction(d)
+        with app.connect() as con:self.assertEqual([row[0] for row in con.execute('SELECT group_name FROM items ORDER BY id')],['Gift',''])
+        d['items'][1]['group_name']=None;app.save_transaction(d)
+        with app.connect() as con:self.assertEqual([row[0] for row in con.execute('SELECT group_name FROM items ORDER BY id')],['Gift',None])
 if __name__=='__main__':unittest.main()

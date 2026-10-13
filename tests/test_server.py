@@ -232,6 +232,22 @@ class ServerTests(unittest.TestCase):
         remaining=self.client.get('/api/data').json['transactions']
         self.assertEqual([(t['merchant'],t['amount']) for t in remaining],[('Cash contribution',-3000)])
 
+    def test_item_groups_survive_restart_and_export_effective_names(self):
+        csrf=self.login()
+        data={'merchant':'Mixed receipt','date':'2026-10-01','amount':'150','category':'Shopping','group_name':'Receipt group','items':[
+            {'name':'Gift','amount':'90','category':'Shopping','group_name':'Gift group'},
+            {'name':'Bike light','amount':'35','category':'Fahrrad','group_name':''},
+            {'name':'Kitchen','amount':'25','category':'Küche & Haushalt','group_name':None}]}
+        self.assertEqual(self.post('/api/transaction',data,csrf).status_code,200)
+        restarted=create_app(password=PASSWORD,public_url='').test_client();self.login(restarted)
+        tx=restarted.get('/api/data').json['transactions'][0]
+        self.assertEqual(tx['amount'],15000)
+        self.assertEqual([item['group_name'] for item in tx['items']],['Gift group','',None])
+        import csv
+        rows=list(csv.reader(io.StringIO(restarted.get('/api/export').get_data(as_text=True)),delimiter=';'))
+        self.assertEqual([row[-1] for row in rows[1:]],['Gift group','','Receipt group'])
+        self.assertEqual(self.client.get('/api/data?dataset=demo').status_code,200)
+
     def test_home_screen_assets_are_available_before_login(self):
         manifest = self.client.get('/manifest.webmanifest')
         self.assertEqual(manifest.status_code, 200)

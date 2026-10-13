@@ -127,7 +127,19 @@ Kategorie einer Gruppe stammt aus ihrer chronologisch ersten positiven Ausgabe.
 Ein Beitrag im Folgemonat bleibt im Folgemonat. Ohne Monatsfilter wird über alle
 Monate verrechnet. Gruppen mit einem Überschuss erscheinen als Gutschrift.
 
-Eine Gruppenzeile öffnen, um ihre Einzelbuchungen zu sehen und zu bearbeiten.
+Bei aufgeteilten Rechnungen hat jede Position eine Gruppenauswahl:
+„Buchungsgruppe übernehmen“ erhält die bisherige Zuordnung der gesamten Buchung,
+„Keine Gruppe“ lässt den Artikel einzeln zählen, „Eigene Gruppe“ ordnet nur diesen
+Artikel einem Gruppennamen zu. Unterschiedliche Artikel dürfen in verschiedene
+Gruppen gehören. Die Positionssumme muss weiterhin dem Buchungsbetrag entsprechen.
+
+Beispiel: Amazon 150 € mit Geschenk 90 €, Fahrradlicht 35 € und Küchenzubehör 25 €.
+Nur das Geschenk erhält eine Gruppe. Beiträge von 20 € und 30 € ergeben effektiv
+40 € fürs Geschenk; die übrigen 60 € zählen unverändert separat. Die ursprüngliche
+Amazon-Buchung bleibt in der Einzelansicht eine Buchung über 150 €. CSV exportiert
+den jeweils wirksamen Gruppennamen pro Position.
+
+Eine Gruppenzeile öffnen, um ihre Buchungen bzw. Positionen zu sehen und zu bearbeiten.
 Ein leeres Gruppenfeld löst eine Buchung wieder aus der Gruppe. Namen gelten
 innerhalb des ausgewählten Datensatzes; gleich geschriebene Namen bilden eine
 Gruppe. Die Einzelbuchungen, CSV-Exporte und Diagramme bleiben erhalten; CSV

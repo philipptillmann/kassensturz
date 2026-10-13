@@ -42,3 +42,25 @@ assert.equal(monthView(gift.map(t=>({...t,group_name:t.group_name==='Gift'?'__pr
 assert.equal(monthView([{...gift[0],amount:3000,items:[]},gift[1]],'2026-10',true)[0].amount,0);
 assert.equal(monthView([{...gift[0],amount:1000,items:[]},gift[1]],'2026-10',true)[0].amount,-2000);
 console.log('Group checks passed: purchase/contributions, monthly boundaries, category anchoring, zero/negative groups, and original data preserved.');
+const mixed=[
+ {id:10,date:'2026-10-01',merchant:'Amazon',amount:15000,category:'Shopping',group_name:'',items:[
+  {id:1,name:'Gift',amount:9000,category:'Shopping',group_name:'Shared gift'},
+  {id:2,name:'Bike light',amount:3500,category:'Fahrrad',group_name:''},
+  {id:3,name:'Kitchen',amount:2500,category:'Küche',group_name:null}]},
+ {id:11,date:'2026-10-02',merchant:'Cash',amount:-2000,category:'Shopping',group_name:'Shared gift',items:[]},
+ {id:12,date:'2026-10-03',merchant:'PayPal',amount:-3000,category:'Shopping',group_name:'Shared gift',items:[]}
+];
+const mixedSnapshot=JSON.stringify(mixed);let effective=monthView(mixed,'2026-10',true);
+assert.equal(effective.length,3);assert.equal(effective.find(t=>t.members).amount,4000);
+assert.equal(effective.find(t=>t.members).members[0].source_id,10);
+assert.equal(effective.filter(t=>!t.members).reduce((n,t)=>n+t.amount,0),6000);
+assert.equal(effective.reduce((n,t)=>n+t.amount,0),10000);
+assert.equal(monthView(mixed,'2026-10',false)[0].amount,15000);assert.equal(JSON.stringify(mixed),mixedSnapshot);
+const both={...mixed[0],group_name:'Whole receipt',items:mixed[0].items.map((i,index)=>({...i,group_name:index===0?'Gift':index===1?'Bike':''}))};
+effective=monthView([both],'2026-10',true);assert.equal(effective.filter(t=>t.members).length,2);
+assert.equal(effective.reduce((n,t)=>n+t.amount,0),15000);
+const noGroups={...mixed[0],group_name:'Whole receipt',items:mixed[0].items.map(i=>({...i,group_name:''}))};
+assert.equal(monthView([noGroups],'2026-10',true).length,1);assert.equal(monthView([noGroups],'2026-10',true)[0].members,undefined);
+const inherit={...mixed[0],group_name:'Whole receipt',items:mixed[0].items.map(i=>({...i,group_name:null}))};
+assert.equal(monthView([inherit],'2026-10',true)[0].amount,15000);assert.equal(monthView([inherit],'2026-10',true)[0].members.length,1);
+console.log('Receipt group checks passed: partial grouping, multiple groups, inheritance, explicit opt-out, and no double counting.');

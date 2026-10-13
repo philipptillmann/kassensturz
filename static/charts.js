@@ -11,12 +11,17 @@
   function monthView(transactions,month,effective=false){
     const selected=transactions.filter(tx=>!month||tx.date.startsWith(month));
     if(!effective)return selected;
+    const parts=tx=>tx.items.length&&tx.items.some(item=>item.group_name!=null)?tx.items.map((item,index)=>({...tx,id:'item:'+tx.id+':'+(item.id??index),source_id:tx.id,part_index:index,item_name:item.name,merchant:tx.merchant+' · '+item.name,amount:item.amount,category:item.category,group_name:item.group_name==null?tx.group_name:item.group_name,items:[]})):[{...tx,source_id:tx.id}];
+    const allParts=transactions.flatMap(parts),selectedParts=selected.flatMap(tx=>{
+      // Unsplit and ungrouped receipts remain one original row.
+      const entries=parts(tx);return entries.some(part=>part.group_name)?entries:[{...tx,group_name:''}];
+    });
     const anchors=new Map();
-    [...transactions].sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id).forEach(tx=>{
+    [...allParts].sort((a,b)=>a.date.localeCompare(b.date)||a.source_id-b.source_id||(a.part_index??0)-(b.part_index??0)).forEach(tx=>{
       if(tx.group_name&&(!anchors.has(tx.group_name)||anchors.get(tx.group_name).amount<=0&&tx.amount>0))anchors.set(tx.group_name,tx);
     });
     const groups=new Map(),rows=[];
-    for(const tx of selected){
+    for(const tx of selectedParts){
       if(!tx.group_name){rows.push(tx);continue}
       if(!groups.has(tx.group_name)){
         const anchor=anchors.get(tx.group_name),group={id:'group:'+tx.group_name,group_name:tx.group_name,merchant:tx.group_name,date:tx.date,amount:0,category:anchor.category,items:[],members:[]};

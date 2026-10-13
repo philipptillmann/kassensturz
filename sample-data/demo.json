@@ -1608,5 +1608,51 @@
     "amount": "-40.00",
     "category": "Shopping",
     "group_name": "Geburtstagsgeschenk"
+  },
+  {
+    "seed_group": "item-groups-v1",
+    "month_offset": 0,
+    "day": 10,
+    "merchant": "Demo · Amazon-Sammelbestellung",
+    "amount": "150.00",
+    "category": "Shopping",
+    "items": [
+      {
+        "name": "Geschenk",
+        "amount": "90.00",
+        "category": "Shopping",
+        "group_name": "Gemeinsames Geschenk"
+      },
+      {
+        "name": "Fahrradlicht",
+        "amount": "35.00",
+        "category": "Fahrrad",
+        "group_name": ""
+      },
+      {
+        "name": "Küchenzubehör",
+        "amount": "25.00",
+        "category": "Küche & Haushalt",
+        "group_name": ""
+      }
+    ]
+  },
+  {
+    "seed_group": "item-groups-v1",
+    "month_offset": 0,
+    "day": 11,
+    "merchant": "Demo · Geschenkbeitrag bar",
+    "amount": "-20.00",
+    "category": "Shopping",
+    "group_name": "Gemeinsames Geschenk"
+  },
+  {
+    "seed_group": "item-groups-v1",
+    "month_offset": 0,
+    "day": 12,
+    "merchant": "Demo · Geschenkbeitrag PayPal",
+    "amount": "-30.00",
+    "category": "Shopping",
+    "group_name": "Gemeinsames Geschenk"
   }
 ]
