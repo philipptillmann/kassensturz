@@ -321,6 +321,23 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.post('/api/delete',{'id':txid},csrf).status_code,200)
         with ledger.connect() as con:self.assertEqual(con.execute('SELECT count(*) FROM receipt_images').fetchone()[0],0)
 
+    def test_own_accounts_and_transfers_are_persistent_and_dataset_scoped(self):
+        csrf=self.login()
+        for name,share in [('Own',100),('Shared',50)]:
+            self.assertEqual(self.post('/api/account',{'name':name,'share_percent':share,'share_income':True},csrf).status_code,200)
+        base={'date':'2026-10-01','category':'Shopping','merchant':'Umbuchung'}
+        outgoing=self.post('/api/transaction',dict(base,amount='200',payment_method='Own'),csrf).json['id']
+        self.assertFalse(self.client.get('/api/data').json['transactions'][0]['internal_transfer'])
+        incoming=self.post('/api/transaction',dict(base,amount='-200',payment_method='Shared'),csrf).json['id']
+        data=self.client.get('/api/data').json
+        self.assertEqual(len(data['transfer_links']),1)
+        self.assertTrue(all(tx['internal_transfer'] for tx in data['transactions']))
+        self.assertEqual(next(a['share_bp'] for a in data['accounts'] if a['payment_method']=='Shared'),5000)
+        self.assertNotIn('Own',[a['payment_method'] for a in self.client.get('/api/data?dataset=demo').json['accounts']])
+        self.assertEqual(self.post('/api/transfer-reject',{'outgoing_id':outgoing,'incoming_id':incoming},csrf).status_code,200)
+        restarted=create_app(password=PASSWORD,public_url='').test_client();self.login(restarted)
+        self.assertFalse(any(tx['internal_transfer'] for tx in restarted.get('/api/data').json['transactions']))
+
     def test_home_screen_assets_are_available_before_login(self):
         manifest = self.client.get('/manifest.webmanifest')
         self.assertEqual(manifest.status_code, 200)

@@ -30,6 +30,8 @@ def prepare_demo(db):
             payment = sample.get('payment_method', '')
             if payment:
                 con.execute('INSERT OR IGNORE INTO payment_methods VALUES (?)', (payment,))
+            if sample.get('account_share') is not None:
+                con.execute('INSERT INTO account_settings VALUES (?,?,1,?) ON CONFLICT(payment_method) DO NOTHING', (payment, sample['account_share'], ''))
             txid = con.execute(
                 'INSERT INTO transactions(date,merchant,amount,category,group_name,payment_method,kind,notes) VALUES (?,?,?,?,?,?,?,?)',
                 (date, sample['merchant'], amount, aliases.get(sample['category'], sample['category']), sample.get('group_name', ''), payment, sample.get('kind', 'expense'), sample.get('notes', ''))).lastrowid

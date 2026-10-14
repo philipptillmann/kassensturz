@@ -1835,5 +1835,35 @@
     "payment_method": "PayPal",
     "kind": "income",
     "notes": "Einmaliger Nebenverdienst"
+  },
+  {
+    "seed_group": "accounts-v1",
+    "month_offset": 0,
+    "day": 10,
+    "merchant": "Demo · Umbuchung Gemeinschaftskonto",
+    "amount": "200.00",
+    "category": "Unkategorisiert",
+    "payment_method": "Demo-Bank",
+    "account_share": 10000
+  },
+  {
+    "seed_group": "accounts-v1",
+    "month_offset": 0,
+    "day": 11,
+    "merchant": "Demo · Umbuchung vom Einzelkonto",
+    "amount": "-200.00",
+    "category": "Unkategorisiert",
+    "payment_method": "Demo-Gemeinschaft",
+    "account_share": 5000
+  },
+  {
+    "seed_group": "accounts-v1",
+    "month_offset": 0,
+    "day": 12,
+    "merchant": "Demo · Gemeinsamer Einkauf",
+    "amount": "80.00",
+    "category": "Lebensmittel",
+    "payment_method": "Demo-Gemeinschaft",
+    "account_share": 5000
   }
 ]

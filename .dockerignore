@@ -6,6 +6,7 @@
 !receipts.py
 !bank_providers.py
 !datasets.py
+!accounts.py
 !sample-data/
 !sample-data/*.json
 !static/

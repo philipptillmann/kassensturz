@@ -202,6 +202,40 @@ Fotos liegen mit der Buchung in der SQLite-Datenbank des gewählten Datensatzes.
 Das dokumentierte SQLite-Backup enthält dadurch auch die Bilder; CSV enthält
 keine Bilder. Die Datenbank und ihre Sicherungen benötigen entsprechend mehr Platz.
 
+### Eigene Konten, Gemeinschaftskonten und Umbuchungen
+
+Unter „Einstellungen → Eigene Bankkonten“ für jedes Konto das entsprechende
+Zahlungsmittel auswählen/eintragen. Einzelkonto: 100 %; Gemeinschaftskonto z. B.
+50 %. Eingehende Beträge werden standardmäßig ebenfalls anteilig berücksichtigt;
+diese Option kann pro Konto ausgeschaltet werden. Optional die eigene IBAN
+hinterlegen. Beim CSV-Import das richtige Quellkonto wählen und, falls vorhanden,
+die Spalte mit der Gegenkonto-IBAN zuordnen. Keine Bank-Passwörter erforderlich.
+
+Ein- und Ausgänge auf unterschiedlichen konfigurierten eigenen Konten werden
+als Umbuchung erkannt, wenn ihre Beträge exakt entgegengesetzt sind, die Daten
+höchstens drei Tage auseinanderliegen und die Gegenkonto-IBAN auf ein eigenes
+Konto verweist oder beide Beschreibungen klare Umbuchungs-/Übertragsbegriffe
+enthalten. Nur beidseitig eindeutige Paare werden automatisch bestätigt. Gleiche
+Beträge allein reichen nicht. Unklare Paare erscheinen unter „Umbuchungen“ zur
+Bestätigung. Falsche Zuordnungen dort als normale Buchungen behandeln; diese
+Entscheidung bleibt gespeichert und kann mit „Erneut prüfen“ zurückgenommen werden. Bereits benannten Ausgabengruppen zugeordnete
+Buchungen/Positionen werden nicht automatisch umgebucht.
+
+Die Einzelansicht behält volle Beträge und zeigt bestätigte Umbuchungen an. In
+„Effektive Kosten“ verschwinden beide Transferbuchungen, auch über Monatsgrenzen,
+bevor Kontoanteile berechnet werden. Übrige Buchungen werden mit dem persönlichen
+Anteil gewichtet. Beispiel: 80 € auf einem 50-%-Konto ergeben 40 € persönliche
+Ausgaben. Die Originalbeträge ändern sich nicht. Cent-Rundung erfolgt je Buchung;
+aufgeteilte Positionen werden so verteilt, dass ihre Summe exakt stimmt. Für die
+Diagramme „Berechnung → Eigener Anteil ohne Umbuchungen“ wählen.
+
+Ein noch nicht importiertes Gegenstück bleibt zunächst sichtbar. Kontoeinstellungen
+und Zuordnungen gelten je Datensatz und sind im Datenbank-Backup enthalten.
+Neue CSV-Importe werden je Zahlungsmittel/Konto auf Duplikate geprüft. Bei alten
+Importen ohne Kontozuordnung zuerst die alten Buchungen zuordnen, damit ein
+erneuter Import unter einem anderen Quellkonto keine zusätzlichen Einträge erzeugt.
+Das Demo enthält eine Umbuchung und einen Einkauf auf einem 50-%-Konto.
+
 ## Betrieb und Daten
 
 ### Updates per SSH / Termius

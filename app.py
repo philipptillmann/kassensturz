@@ -26,6 +26,9 @@ def init(db=None):
         CREATE TABLE IF NOT EXISTS transactions(id INTEGER PRIMARY KEY, date TEXT NOT NULL, merchant TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name), import_key TEXT UNIQUE);
         CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, name TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name));
         CREATE TABLE IF NOT EXISTS receipt_images(transaction_id INTEGER PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE, image BLOB NOT NULL);
+        CREATE TABLE IF NOT EXISTS account_settings(payment_method TEXT PRIMARY KEY REFERENCES payment_methods(name), share_bp INTEGER NOT NULL, share_income INTEGER NOT NULL, iban TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS transfer_links(outgoing_id INTEGER PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE,incoming_id INTEGER UNIQUE NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,manual INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS transfer_ignored(outgoing_id INTEGER REFERENCES transactions(id) ON DELETE CASCADE,incoming_id INTEGER REFERENCES transactions(id) ON DELETE CASCADE,PRIMARY KEY(outgoing_id,incoming_id));
         ''')
         if 'group_name' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
             c.execute("ALTER TABLE transactions ADD COLUMN group_name TEXT NOT NULL DEFAULT ''")
@@ -37,6 +40,8 @@ def init(db=None):
             c.execute("ALTER TABLE transactions ADD COLUMN kind TEXT NOT NULL DEFAULT 'expense'")
         if 'notes' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
             c.execute("ALTER TABLE transactions ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+        if 'counterparty_iban' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
+            c.execute("ALTER TABLE transactions ADD COLUMN counterparty_iban TEXT NOT NULL DEFAULT ''")
         for name in CATEGORIES:
             if not c.execute('SELECT 1 FROM category_aliases WHERE alias=?', (name,)).fetchone():
                 c.execute('INSERT OR IGNORE INTO categories VALUES (?)', (name,))
@@ -153,19 +158,32 @@ def import_csv(d, db=None):
             merchant = row[d['merchant_column']].strip()
             amount = cents(row[d['amount_column']]) * (-1 if d.get('bank_sign', True) else 1)
             if not merchant: raise ValueError('Händler fehlt')
-            canonical = json.dumps([date,merchant,amount],ensure_ascii=False)
+            payment = d.get('payment_method', '')
+            canonical = json.dumps([date,merchant,amount,payment],ensure_ascii=False)
             occurrences[canonical] = occurrences.get(canonical,0) + 1
             key = hashlib.sha256((canonical + ':' + str(occurrences[canonical])).encode()).hexdigest()
-            prepared.append((date,merchant,amount,'Unkategorisiert',key))
+            legacy = json.dumps([date,merchant,amount],ensure_ascii=False)
+            legacy_key = hashlib.sha256((legacy + ':' + str(occurrences[canonical])).encode()).hexdigest()
+            counterpart = ''
+            if d.get('counterparty_column'):
+                counterpart = re.sub(r'\s+', '', str(row[d['counterparty_column']])).upper()
+                if len(counterpart) > 34:
+                    raise ValueError('Gegenkonto ist zu lang')
+            prepared.append((date,merchant,amount,'Unkategorisiert',key,legacy_key,counterpart))
         except (ValueError, KeyError, TypeError) as e: raise ValueError(f'CSV-Zeile {index}: {e}')
     with connect(db) as c:
         payment = d.get('payment_method', '')
         if not isinstance(payment, str) or payment and not c.execute('SELECT 1 FROM payment_methods WHERE name=?', (payment,)).fetchone():
             raise ValueError('Unbekanntes Zahlungsmittel.')
         category = c.execute("SELECT name FROM category_aliases WHERE alias='Unkategorisiert'").fetchone()[0]
-        prepared = [(date,merchant,amount,category,key,payment) for date,merchant,amount,_,key in prepared]
+        mapped = []
+        for date,merchant,amount,_,key,legacy_key,counterpart in prepared:
+            old = c.execute('SELECT payment_method FROM transactions WHERE import_key=?', (legacy_key,)).fetchone()
+            if old and old['payment_method'] == payment:
+                key = legacy_key
+            mapped.append((date,merchant,amount,category,key,payment,counterpart))
         before = c.total_changes
-        c.executemany('INSERT OR IGNORE INTO transactions(date,merchant,amount,category,import_key,payment_method) VALUES (?,?,?,?,?,?)',prepared)
+        c.executemany('INSERT OR IGNORE INTO transactions(date,merchant,amount,category,import_key,payment_method,counterparty_iban) VALUES (?,?,?,?,?,?,?)',mapped)
         added = c.total_changes-before
     return {'added':added,'skipped':len(prepared)-added}
 

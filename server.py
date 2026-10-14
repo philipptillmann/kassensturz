@@ -16,6 +16,7 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import app as ledger
+import accounts
 from datasets import prepare_demo
 from receipts import OCRBusy
 
@@ -207,6 +208,7 @@ def create_app(password=None, public_url=None):
 
     @web.get('/api/data')
     def data():
+        accounts.reconcile_transfers(dataset_paths[g.dataset])
         with data_connect() as con:
             transactions = [dict(x) for x in con.execute('SELECT transactions.*, EXISTS(SELECT 1 FROM receipt_images WHERE transaction_id=transactions.id) AS has_receipt FROM transactions ORDER BY date DESC,id DESC')]
             all_items = {}
@@ -217,7 +219,14 @@ def create_app(password=None, public_url=None):
             categories = [x[0] for x in con.execute('SELECT name FROM categories ORDER BY name')]
             payments = [x[0] for x in con.execute('SELECT name FROM payment_methods ORDER BY name')]
             default_category = con.execute("SELECT name FROM category_aliases WHERE alias='Unkategorisiert'").fetchone()[0]
-        return jsonify(transactions=transactions, categories=categories, payment_methods=payments, default_category=default_category, dataset=g.dataset)
+            account_settings = [dict(row) for row in con.execute('SELECT * FROM account_settings ORDER BY payment_method')]
+            links = [dict(row) for row in con.execute('SELECT * FROM transfer_links')]
+            rejected = [dict(row) for row in con.execute('SELECT * FROM transfer_ignored')]
+            linked = {id for link in links for id in (link['outgoing_id'],link['incoming_id'])}
+            candidates = [pair for pair in accounts.candidate_pairs(con) if pair['outgoing_id'] not in linked and pair['incoming_id'] not in linked]
+            for transaction in transactions:
+                transaction['internal_transfer'] = transaction['id'] in linked
+        return jsonify(transactions=transactions, categories=categories, payment_methods=payments, default_category=default_category, accounts=account_settings, transfer_links=links, transfer_candidates=candidates, transfer_rejected=rejected, dataset=g.dataset)
 
     @web.get('/api/receipt/<int:transaction_id>')
     def receipt_image(transaction_id):
@@ -271,6 +280,17 @@ def create_app(password=None, public_url=None):
                 item['category'] = aliases.get(item['category'], item['category'])
         elif action == 'category-rename':
             result = ledger.rename_category(data['old_name'], data['name'], db=dataset_paths[g.dataset])
+        elif action == 'account':
+            result = accounts.configure_account(data, dataset_paths[g.dataset])
+        elif action == 'transfer-confirm':
+            result = accounts.confirm_transfer(data, dataset_paths[g.dataset])
+        elif action == 'transfer-reject':
+            result = accounts.reject_transfer(data, dataset_paths[g.dataset])
+        elif action == 'transfer-reconsider':
+            with data_connect() as con:
+                con.execute('DELETE FROM transfer_ignored WHERE outgoing_id=? AND incoming_id=?', (int(data['outgoing_id']),int(data['incoming_id'])))
+            accounts.reconcile_transfers(dataset_paths[g.dataset])
+            result = {'ok': True}
         elif action == 'payment-method':
             name = data.get('name')
             if not isinstance(name, str) or not name.strip() or len(name.strip()) > 60:

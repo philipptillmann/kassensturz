@@ -8,7 +8,24 @@
     if(end-start>239)return [];
     return Array.from({length:end-start+1},(_,i)=>`${Math.floor((start+i)/12)}-${String((start+i)%12+1).padStart(2,'0')}`);
   }
-  function monthView(transactions,month,effective=false){
+  function personalView(transactions,accounts=[],effective=false){
+    if(!effective)return transactions;
+    const settings=new Map(accounts.map(account=>[account.payment_method,account]));
+    const round=n=>Math.sign(n)*Math.round(Math.abs(n)/10000);
+    return transactions.filter(tx=>!tx.internal_transfer).map(tx=>{
+      const account=settings.get(tx.payment_method),share=!account||tx.amount<0&&!account.share_income?10000:account.share_bp;
+      const amount=round(tx.amount*share);
+      const items=tx.items.map(item=>({...item,amount:Math.trunc(item.amount*share/10000)}));
+      if(items.length){
+        const delta=amount-items.reduce((sum,item)=>sum+item.amount,0);
+        const order=tx.items.map((item,i)=>({i,remainder:item.amount*share%10000})).sort((a,b)=>delta>=0?b.remainder-a.remainder:a.remainder-b.remainder);
+        for(let n=0;n<Math.abs(delta);n++)items[order[n%order.length].i].amount+=Math.sign(delta);
+      }
+      return {...tx,amount,items,original_amount:tx.amount,personal_share_bp:share};
+    });
+  }
+  function monthView(transactions,month,effective=false,accounts=[]){
+    transactions=personalView(transactions,accounts,effective);
     const selected=transactions.filter(tx=>!month||tx.date.startsWith(month));
     if(!effective)return selected;
     const parts=tx=>tx.items.length&&tx.items.some(item=>item.group_name!=null)?tx.items.map((item,index)=>({...tx,id:'item:'+tx.id+':'+(item.id??index),source_id:tx.id,part_index:index,item_name:item.name,merchant:tx.merchant+' · '+item.name,amount:item.amount,category:item.category,group_name:item.group_name==null?tx.group_name:item.group_name,items:[]})):[{...tx,source_id:tx.id}];
@@ -52,6 +69,6 @@
     const categoryRows=ranked(categories);
     return {months,monthly:[...monthly],categories:categoryRows,merchants:ranked(merchants),series:categoryRows.slice(0,5).map(([name])=>({name,values:[...series.get(name)]})),expenses,credits,income,net:expenses-credits};
   }
-  root.KassensturzReports={monthsBetween,aggregate,monthView};
+  root.KassensturzReports={monthsBetween,aggregate,monthView,personalView};
   if(typeof module!=='undefined')module.exports=root.KassensturzReports;
 })(typeof window==='undefined'?globalThis:window);

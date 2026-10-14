@@ -71,3 +71,13 @@ assert.equal(aggregate([...gift,salary],{from:'2026-10',to:'2026-10',metric:'inc
 assert.equal(aggregate([salary],{from:'2026-10',to:'2026-10',category:'Shopping',metric:'income'}).income,0);
 const salaryView=monthView([...gift,salary],'2026-10',true);assert.equal(salaryView.find(t=>t.members).amount,5000);assert.equal(salaryView.find(t=>t.kind==='income').amount,-280000);
 console.log('Income checks passed: separate income totals/charts and no offset against expenses or groups.');
+const {personalView}=require('../static/charts.js');
+const sharedAccounts=[{payment_method:'Shared',share_bp:5000,share_income:1}];
+const sharedTx=[{id:90,date:'2026-10-01',merchant:'Shared shopping',payment_method:'Shared',category:'Shopping',amount:8000,items:[]},{id:91,date:'2026-10-02',merchant:'Shared salary',payment_method:'Shared',category:'Gehalt',kind:'income',amount:-10000,items:[]},{id:92,date:'2026-09-30',merchant:'Transfer out',amount:20000,items:[],internal_transfer:true},{id:93,date:'2026-10-01',merchant:'Transfer in',amount:-20000,items:[],internal_transfer:true}];
+assert.equal(personalView(sharedTx,sharedAccounts,false)[0].amount,8000);
+const personal=personalView(sharedTx,sharedAccounts,true);assert.equal(personal.length,2);assert.equal(personal[0].amount,4000);assert.equal(personal[1].amount,-5000);assert.equal(sharedTx[0].amount,8000);
+assert.equal(monthView(sharedTx,'2026-10',true,sharedAccounts).length,2);
+assert.equal(personalView(sharedTx,[{...sharedAccounts[0],share_income:0}],true)[1].amount,-10000);
+const tiny={id:94,date:'2026-10-01',payment_method:'Shared',amount:10,items:Array.from({length:10},()=>({amount:1,category:'Shopping'}))};
+const rounded=personalView([tiny],sharedAccounts,true)[0];assert.equal(rounded.amount,5);assert.equal(rounded.items.reduce((n,i)=>n+i.amount,0),5);assert(rounded.items.every(i=>i.amount>=0));
+console.log('Account reporting checks passed: shared expenses/income, rounding, transfer exclusion across months, and unchanged original amounts.');
