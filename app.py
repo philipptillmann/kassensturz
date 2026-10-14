@@ -25,6 +25,7 @@ def init(db=None):
         CREATE TABLE IF NOT EXISTS payment_methods(name TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS transactions(id INTEGER PRIMARY KEY, date TEXT NOT NULL, merchant TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name), import_key TEXT UNIQUE);
         CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, name TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name));
+        CREATE TABLE IF NOT EXISTS receipt_images(transaction_id INTEGER PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE, image BLOB NOT NULL);
         ''')
         if 'group_name' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
             c.execute("ALTER TABLE transactions ADD COLUMN group_name TEXT NOT NULL DEFAULT ''")
@@ -67,6 +68,15 @@ def read_csv(text):
     return reader.fieldnames, rows
 
 def save_transaction(d, db=None):
+    receipt = None
+    if 'receipt_image' in d:
+        from receipts import prepare_jpeg
+        receipt = prepare_jpeg(d['receipt_image'])
+    remove_receipt = d.get('remove_receipt', False)
+    if not isinstance(remove_receipt, bool):
+        raise ValueError('Ungültige Belegeinstellung.')
+    if receipt is not None and remove_receipt:
+        raise ValueError('Beleg nicht gleichzeitig ersetzen und entfernen.')
     kind = d.get('kind', 'expense')
     if d.get('id') and 'kind' not in d:
         with connect(db) as con:
@@ -128,6 +138,10 @@ def save_transaction(d, db=None):
         c.execute('UPDATE transactions SET kind=? WHERE id=?', (kind, txid))
         c.execute('UPDATE transactions SET notes=? WHERE id=?', (notes or '', txid))
         c.executemany('INSERT INTO items(transaction_id,name,amount,category,group_name) VALUES (?,?,?,?,?)',[(txid,*x) for x in converted])
+        if receipt is not None:
+            c.execute('INSERT INTO receipt_images(transaction_id,image) VALUES (?,?) ON CONFLICT(transaction_id) DO UPDATE SET image=excluded.image', (txid, receipt))
+        elif remove_receipt:
+            c.execute('DELETE FROM receipt_images WHERE transaction_id=?', (txid,))
     return {'id': txid}
 
 def import_csv(d, db=None):

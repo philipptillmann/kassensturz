@@ -1,4 +1,4 @@
-"""Image decoding and Tesseract OCR; receipt images never persist in the data volume."""
+"""Receipt image decoding, compact JPEG archiving and Tesseract OCR."""
 import base64
 import binascii
 import io
@@ -15,6 +15,45 @@ from pillow_heif import register_heif_opener
 register_heif_opener()
 Image.MAX_IMAGE_PIXELS = 25_000_000
 OCR_SLOT = threading.BoundedSemaphore(1)
+ARCHIVE_SLOT = threading.BoundedSemaphore(1)
+
+
+def prepare_jpeg(encoded):
+    """Keep the full photo, orient it correctly, and strip camera metadata."""
+    if not isinstance(encoded, str):
+        raise ValueError('Bitte eine Bilddatei auswählen.')
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except (ValueError, binascii.Error):
+        raise ValueError('Ungültige Bilddatei.') from None
+    if not raw or len(raw) > 12_000_000:
+        raise ValueError('Bild ist leer oder zu groß (maximal 12 MB).')
+    if not ARCHIVE_SLOT.acquire(blocking=False):
+        raise OCRBusy('Die Bildverarbeitung ist gerade belegt. Bitte kurz warten und erneut speichern.')
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(raw)) as source:
+                if source.width * source.height > Image.MAX_IMAGE_PIXELS:
+                    raise ValueError('Bildauflösung ist zu hoch (maximal 25 Megapixel).')
+                oriented = ImageOps.exif_transpose(source)
+                if oriented.mode in ('RGBA', 'LA') or 'transparency' in oriented.info:
+                    rgba = oriented.convert('RGBA')
+                    image = Image.new('RGB', rgba.size, 'white')
+                    image.paste(rgba, mask=rgba.getchannel('A'))
+                else:
+                    image = oriented.convert('RGB')
+                image.thumbnail((3200, 3200), Image.Resampling.LANCZOS)
+                # Copy pixels without EXIF, GPS, comments or embedded thumbnails.
+                clean = Image.new('RGB', image.size)
+                clean.paste(image)
+                out = io.BytesIO()
+                clean.save(out, format='JPEG', quality=85, optimize=True, progressive=True, subsampling=0)
+                return out.getvalue()
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError, Image.DecompressionBombWarning):
+        raise ValueError('Bild nicht lesbar. Bitte JPEG, PNG, WebP oder HEIC verwenden.') from None
+    finally:
+        ARCHIVE_SLOT.release()
 
 
 def recognize_text(encoded):

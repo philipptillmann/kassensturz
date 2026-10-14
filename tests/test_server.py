@@ -292,6 +292,35 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(rows[1][rows[0].index('Notizen')],"'"+notes)
         self.assertNotIn(notes,[tx['notes'] for tx in self.client.get('/api/data?dataset=demo').json['transactions']])
 
+    def test_receipt_archive_is_authenticated_atomic_and_dataset_scoped(self):
+        csrf=self.login();image=Image.new('RGB',(300,500),'white');stream=io.BytesIO();image.save(stream,format='PNG')
+        encoded=base64.b64encode(stream.getvalue()).decode()
+        data={'merchant':'Receipt purchase','date':'2026-10-01','amount':'7.25','category':'Shopping','receipt_image':encoded}
+        response=self.post('/api/transaction',data,csrf);self.assertEqual(response.status_code,200);txid=response.json['id']
+        self.assertTrue(self.client.get('/api/data').json['transactions'][0]['has_receipt'])
+        url=f'/api/receipt/{txid}'
+        stored=self.client.get(url);self.assertEqual(stored.status_code,200);self.assertEqual(stored.content_type,'image/jpeg')
+        self.assertEqual(self.app.test_client().get(url).status_code,401)
+        self.assertEqual(self.client.get(url+'?dataset=demo').status_code,404)
+        restarted=create_app(password=PASSWORD,public_url='').test_client();self.login(restarted)
+        self.assertEqual(restarted.get(url).data,stored.data)
+        with ledger.connect() as con:
+            backup=sqlite3.connect(':memory:');con.backup(backup)
+            self.assertEqual(bytes(backup.execute('SELECT image FROM receipt_images').fetchone()[0]),stored.data);backup.close()
+        data.update(id=txid);del data['receipt_image'];data['amount']='8'
+        self.assertEqual(self.post('/api/transaction',data,csrf).status_code,200)
+        self.assertEqual(self.client.get(url).data,stored.data)
+        data.update(receipt_image='invalid',amount='99')
+        self.assertEqual(self.post('/api/transaction',data,csrf).status_code,400)
+        self.assertEqual(self.client.get('/api/data').json['transactions'][0]['amount'],800)
+        del data['receipt_image'];data['remove_receipt']=True
+        self.assertEqual(self.post('/api/transaction',data,csrf).status_code,200)
+        self.assertEqual(self.client.get(url).status_code,404)
+        data['remove_receipt']=False;data['receipt_image']=encoded
+        self.post('/api/transaction',data,csrf)
+        self.assertEqual(self.post('/api/delete',{'id':txid},csrf).status_code,200)
+        with ledger.connect() as con:self.assertEqual(con.execute('SELECT count(*) FROM receipt_images').fetchone()[0],0)
+
     def test_home_screen_assets_are_available_before_login(self):
         manifest = self.client.get('/manifest.webmanifest')
         self.assertEqual(manifest.status_code, 200)
@@ -310,6 +339,25 @@ class ServerTests(unittest.TestCase):
 
 
 class ReceiptTests(unittest.TestCase):
+    def test_archive_jpeg_limits_size_preserves_orientation_and_strips_metadata(self):
+        image=Image.new('RGB',(3600,1800),'white')
+        exif=Image.Exif();exif[274]=6;exif[270]='Private camera metadata'
+        stream=io.BytesIO();image.save(stream,format='JPEG',exif=exif)
+        result=receipts.prepare_jpeg(base64.b64encode(stream.getvalue()).decode())
+        with Image.open(io.BytesIO(result)) as decoded:
+            self.assertEqual(decoded.format,'JPEG');self.assertEqual(decoded.size,(1600,3200))
+            self.assertFalse(decoded.getexif());self.assertEqual(decoded.mode,'RGB')
+    def test_archive_heic_and_transparency_and_small_images(self):
+        from pillow_heif import from_pillow
+        for format in ('HEIC','PNG'):
+            image=Image.new('RGBA',(100,60),(0,0,0,0));stream=io.BytesIO()
+            if format=='HEIC':from_pillow(image.convert('RGB')).save(stream)
+            else:image.save(stream,format='PNG')
+            result=receipts.prepare_jpeg(base64.b64encode(stream.getvalue()).decode())
+            with Image.open(io.BytesIO(result)) as decoded:
+                self.assertEqual(decoded.format,'JPEG');self.assertEqual(decoded.size,(100,60))
+                if format=='PNG':self.assertEqual(decoded.getpixel((0,0)),(255,255,255))
+        with self.assertRaises(ValueError):receipts.prepare_jpeg('bad base64')
     def test_real_tesseract_receipt(self):
         if not shutil.which('tesseract'):
             if os.environ.get('CHECK_CONTAINER'):

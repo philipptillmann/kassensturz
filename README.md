@@ -35,7 +35,7 @@ docker compose ps
 - Auf Laptop und Handy im gleichen Netzwerk: `http://SERVER-IP:8080`, z. B. `http://192.168.1.50:8080`
 - Auf beiden Geräten mit demselben Passwort anmelden. Bei Bedarf Port 8080 in der Firewall für das private Netz erlauben.
 
-Das Handy benötigt keine eigene App. „Rechnung scannen“ öffnet die Fotoauswahl bzw. Kamera. Fotos werden zum Server übertragen, dort verarbeitet und danach gelöscht. Änderungen sind beim erneuten Öffnen der Seite bzw. Zurückkehren zum Browser-Tab sichtbar. Bei gleichzeitigem Bearbeiten derselben Buchung gilt die zuletzt gespeicherte Änderung.
+Das Handy benötigt keine eigene App. „Rechnung scannen“ öffnet die Fotoauswahl bzw. Kamera. Fotos werden zum Server übertragen und für die Texterkennung verarbeitet. Beim Speichern der Buchung wird das Foto als komprimiertes JPEG in der Datenbank archiviert. Änderungen sind beim erneuten Öffnen der Seite bzw. Zurückkehren zum Browser-Tab sichtbar. Bei gleichzeitigem Bearbeiten derselben Buchung gilt die zuletzt gespeicherte Änderung.
 
 Die Standard-Konfiguration verwendet HTTP und ist für ein vertrauenswürdiges privates Netzwerk gedacht. Für Zugriff über das Internet die folgende HTTPS-Variante verwenden. Keine HTTP-Portfreigabe ins Internet einrichten.
 
@@ -106,7 +106,7 @@ stattdessen `/data/demo.sqlite3` als Quelldatenbank verwenden.
 - Eine Buchung lässt sich in einzelne Artikel mit verschiedenen Kategorien aufteilen. Die Positionssumme muss dem Buchungsbetrag entsprechen.
 - OCR auf dem Server mit Tesseract, Deutsch und Englisch. JPEG, PNG, WebP und HEIC; maximal 12 MB und 25 Megapixel. Automatische Ausrichtung anhand der EXIF-Daten.
 - Einfache Stichwortvorschläge für Kategorien. Erkannte Positionen und Beträge vor dem Speichern prüfen. Mehrspaltige Rechnungen benötigen ggf. manuelle Nacharbeit.
-- Eine OCR-Anfrage gleichzeitig; weitere Anfragen erhalten einen Hinweis zum erneuten Versuch. Verarbeitung endet nach maximal 60 Sekunden. Keine Cloud-OCR, kein dauerhaftes Fotoarchiv, keine PDF-Erkennung.
+- Eine OCR-Anfrage gleichzeitig; weitere Anfragen erhalten einen Hinweis zum erneuten Versuch. Verarbeitung endet nach maximal 60 Sekunden. Keine Cloud-OCR und keine PDF-Erkennung. Belegfotos werden beim Speichern dauerhaft als JPEG archiviert.
 
 Rechnungen für bereits importierte Umsätze **an der bestehenden Buchung** erfassen, um doppelte Ausgaben zu vermeiden. Bei CSV-Importen werden identische Buchungen anhand Datum, Händler, Betrag und Vorkommensnummer erkannt. Überlappende Teil-Exporte können ohne Bank-ID nicht immer eindeutig abgeglichen werden. Einnahmen werden als Gutschriften angezeigt; Kategorie-Auswertungen zählen positive Positionen vor Erstattungen.
 
@@ -180,6 +180,27 @@ lassen sich später bearbeiten oder löschen, werden durchsucht und als Text im
 CSV-Export mitgeführt. Die Liste zeigt eine kurze Vorschau; die vollständige
 Notiz steht im Buchungseditor. Notizen gehören zur ursprünglichen Buchung,
 auch bei einer Rechnung mit mehreren Positionen oder Gruppen.
+
+### Gespeicherte Belegfotos
+
+Ein ausgewähltes Foto wird beim Speichern der Buchung als JPEG archiviert, auch
+wenn die Texterkennung fehlschlägt und die Daten manuell eingegeben werden.
+JPEG, PNG, WebP und HEIC werden unterstützt. Das vollständige Foto wird anhand
+seiner EXIF-Ausrichtung gedreht, auf höchstens 3200 Pixel an der längsten Seite
+verkleinert (kleine Bilder werden nicht vergrößert) und mit JPEG-Qualität 85 gespeichert.
+Kamerametadaten werden entfernt. Es gibt keine automatische Beschneidung oder
+starre Dateigrößengrenze nach der Konvertierung, die lange Belege unlesbar machen könnte.
+Die archivierte JPEG-Kopie ersetzt die ursprüngliche Datei, kein unverändertes Original.
+
+Im Buchungseditor „Gespeicherten Beleg ansehen“ wählen. Ein neues Foto ersetzt
+den vorhandenen Beleg erst beim Speichern; „Beleg entfernen“ ebenfalls. Abbrechen
+ändert den gespeicherten Beleg nicht. Pro Buchung wird ein Foto gespeichert.
+Beim Löschen der Buchung wird auch ihr Beleg gelöscht. Bereits früher nur per OCR
+verarbeitete Fotos können nicht nachträglich wiederhergestellt werden.
+
+Fotos liegen mit der Buchung in der SQLite-Datenbank des gewählten Datensatzes.
+Das dokumentierte SQLite-Backup enthält dadurch auch die Bilder; CSV enthält
+keine Bilder. Die Datenbank und ihre Sicherungen benötigen entsprechend mehr Platz.
 
 ## Betrieb und Daten
 

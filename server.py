@@ -208,7 +208,7 @@ def create_app(password=None, public_url=None):
     @web.get('/api/data')
     def data():
         with data_connect() as con:
-            transactions = [dict(x) for x in con.execute('SELECT * FROM transactions ORDER BY date DESC,id DESC')]
+            transactions = [dict(x) for x in con.execute('SELECT transactions.*, EXISTS(SELECT 1 FROM receipt_images WHERE transaction_id=transactions.id) AS has_receipt FROM transactions ORDER BY date DESC,id DESC')]
             all_items = {}
             for item in con.execute('SELECT * FROM items ORDER BY id'):
                 all_items.setdefault(item['transaction_id'], []).append(dict(item))
@@ -218,6 +218,17 @@ def create_app(password=None, public_url=None):
             payments = [x[0] for x in con.execute('SELECT name FROM payment_methods ORDER BY name')]
             default_category = con.execute("SELECT name FROM category_aliases WHERE alias='Unkategorisiert'").fetchone()[0]
         return jsonify(transactions=transactions, categories=categories, payment_methods=payments, default_category=default_category, dataset=g.dataset)
+
+    @web.get('/api/receipt/<int:transaction_id>')
+    def receipt_image(transaction_id):
+        with data_connect() as con:
+            row = con.execute('SELECT image FROM receipt_images WHERE transaction_id=?', (transaction_id,)).fetchone()
+        if row is None:
+            return failure('Kein Beleg vorhanden.', 404)
+        response = make_response(bytes(row['image']))
+        response.headers['Content-Type'] = 'image/jpeg'
+        response.headers['Content-Disposition'] = f'inline; filename=kassensturz-beleg-{transaction_id}.jpg'
+        return response
 
     @web.get('/api/export')
     def export():
