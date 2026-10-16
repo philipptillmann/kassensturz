@@ -1,4 +1,4 @@
-"""Password-protected, single-household WSGI application."""
+"""Authenticated WSGI application with isolated per-user financial databases."""
 import csv
 import hashlib
 import io
@@ -17,6 +17,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 import app as ledger
 import accounts
+import users
 from datasets import prepare_demo
 from receipts import OCRBusy
 
@@ -52,6 +53,8 @@ def create_app(password=None, public_url=None):
     auth_version = hashlib.pbkdf2_hmac('sha256', password.encode(), b'kassensturz-session-version-v1', 600_000).hex()
     del password
     ledger.init()
+    auth_db = Path(ledger.DB)
+    users.init(auth_db)
     dataset_paths = {'private': ledger.DB, 'demo': ledger.DB.parent / 'demo.sqlite3'}
     prepare_demo(dataset_paths['demo'])
     login_attempts = deque(maxlen=20)
@@ -68,7 +71,7 @@ def create_app(password=None, public_url=None):
                 return failure('Ungültiger Ursprung. Bitte die konfigurierte Serveradresse verwenden.', 403)
             if not request.is_json:
                 return failure('JSON erwartet.', 415)
-        public_paths = {'/login', '/login.js', '/style.css', '/api/login', '/healthz', '/manifest.webmanifest',
+        public_paths = {'/login', '/login.js', '/style.css', '/api/login', '/api/auth-status', '/healthz', '/manifest.webmanifest',
                         '/icons/icon.svg', '/icons/icon-180.png', '/icons/icon-192.png', '/icons/icon-512.png'}
         if request.path in public_paths:
             return None
@@ -76,9 +79,14 @@ def create_app(password=None, public_url=None):
         row = None
         if token and len(token) <= 100:
             token_hash = hashlib.sha256(token.encode()).hexdigest()
-            with ledger.connect() as con:
-                row = con.execute('SELECT * FROM sessions WHERE token_hash=? AND expires>? AND auth_version=?',
-                                  (token_hash, int(time.time()), auth_version)).fetchone()
+            with ledger.connect(auth_db) as con:
+                row = con.execute('SELECT * FROM sessions WHERE token_hash=? AND expires>?',
+                                  (token_hash, int(time.time()))).fetchone()
+                g.user = con.execute('SELECT * FROM users WHERE id=?', (row['user_id'],)).fetchone() if row and row['user_id'] else None
+                named = con.execute('SELECT 1 FROM users LIMIT 1').fetchone()
+                expected = users.version(g.user) if g.user else auth_version
+                if row and (row['auth_version'] != expected or (named and not g.user)):
+                    row = None
             if row:
                 g.session_hash = token_hash
                 g.csrf = row['csrf']
@@ -92,9 +100,10 @@ def create_app(password=None, public_url=None):
         if dataset not in dataset_paths:
             return failure('Unbekannter Datensatz.')
         g.dataset = dataset
+        g.dataset_paths = users.paths(auth_db, g.user)
 
     def data_connect():
-        return ledger.connect(dataset_paths[g.dataset])
+        return ledger.connect(g.dataset_paths[g.dataset])
 
     @web.after_request
     def headers(response):
@@ -133,7 +142,7 @@ def create_app(password=None, public_url=None):
 
     @web.get('/healthz')
     def health():
-        with ledger.connect() as con:
+        with ledger.connect(auth_db) as con:
             con.execute('SELECT 1 FROM categories LIMIT 1').fetchone()
         return jsonify(status='ok')
 
@@ -161,7 +170,7 @@ def create_app(password=None, public_url=None):
             return failure('Ungültige Sitzungseinstellung.')
         session_seconds = REMEMBER_SECONDS if remember else SESSION_SECONDS
         now = time.time()
-        # A global limit protects the shared password even behind a reverse proxy.
+        # A global limit protects logins even behind a reverse proxy.
         with login_lock:
             while login_attempts and now - login_attempts[0] >= 60:
                 login_attempts.popleft()
@@ -171,27 +180,74 @@ def create_app(password=None, public_url=None):
                 response.headers['Retry-After'] = '60'
                 return response
             login_attempts.append(now)
-        if not check_password_hash(password_hash, data['password']):
-            return failure('Falsches Passwort.', 401)
+        with ledger.connect(auth_db) as con:
+            named = con.execute('SELECT 1 FROM users LIMIT 1').fetchone()
+            username = data.get('username', '')
+            user = con.execute('SELECT * FROM users WHERE username=?', (username.strip().lower(),)).fetchone() if isinstance(username, str) else None
+        candidate_hash = user['password_hash'] if named and user else password_hash
+        valid = check_password_hash(candidate_hash, data['password'])
+        if not valid or (named and not user):
+            return failure('Benutzername oder Passwort falsch.', 401)
+        session_version = users.version(user) if named else auth_version
+        user_id = user['id'] if named else None
         token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
-        with ledger.connect() as con:
-            con.execute('DELETE FROM sessions WHERE expires<=? OR auth_version!=?', (int(now), auth_version))
+        with ledger.connect(auth_db) as con:
+            con.execute('DELETE FROM sessions WHERE expires<=?', (int(now),))
+            if user_id is None and con.execute('SELECT 1 FROM users LIMIT 1').fetchone():
+                return failure('Bitte mit Benutzername anmelden.', 401)
             old_token = request.cookies.get('session', '')
             if old_token:
                 con.execute('DELETE FROM sessions WHERE token_hash=?', (hashlib.sha256(old_token.encode()).hexdigest(),))
-            con.execute('INSERT INTO sessions VALUES (?,?,?,?)',
-                        (hashlib.sha256(token.encode()).hexdigest(), csrf, int(now) + session_seconds, auth_version))
+            con.execute('INSERT INTO sessions(token_hash,csrf,expires,auth_version,user_id) VALUES (?,?,?,?,?)',
+                        (hashlib.sha256(token.encode()).hexdigest(), csrf, int(now) + session_seconds, session_version, user_id))
         response = jsonify(csrf=csrf)
         response.set_cookie('session', token, max_age=session_seconds, httponly=True, secure=secure, samesite='Strict', path='/')
         return response
 
     @web.get('/api/session')
     def session_info():
-        return jsonify(csrf=g.csrf)
+        return jsonify(csrf=g.csrf, user=users.public(g.user), needs_migration=g.user is None)
+
+    @web.get('/api/auth-status')
+    def auth_status():
+        with ledger.connect(auth_db) as con:
+            return jsonify(needs_migration=con.execute('SELECT 1 FROM users LIMIT 1').fetchone() is None)
+
+    @web.post('/api/users/migrate')
+    def migrate_user():
+        if g.user is not None:
+            return failure('Bereits einem Konto zugeordnet.', 409)
+        users.create(auth_db, request.get_json(), migrate=True)
+        response = jsonify(ok=True)
+        response.delete_cookie('session', path='/', secure=secure, httponly=True, samesite='Strict')
+        return response
+
+    @web.route('/api/users', methods=['GET', 'POST'])
+    def manage_users():
+        if g.user is None or not g.user['is_admin']:
+            return failure('Nur für Administratoren.', 403)
+        if request.method == 'POST':
+            users.create(auth_db, request.get_json())
+        with ledger.connect(auth_db) as con:
+            return jsonify(users=[users.public(row) for row in con.execute('SELECT * FROM users ORDER BY username')])
+
+    @web.post('/api/users/password')
+    def change_password():
+        if g.user is None:
+            return failure('Bitte zuerst ein Benutzerkonto anlegen.', 409)
+        data = request.get_json()
+        current = data.get('current_password', '')
+        if not isinstance(current, str) or not check_password_hash(g.user['password_hash'], current):
+            return failure('Aktuelles Passwort falsch.', 403)
+        _, hashed = users.credentials({'username': g.user['username'], 'password': data.get('password')})
+        with ledger.connect(auth_db) as con:
+            con.execute('UPDATE users SET password_hash=? WHERE id=?', (hashed,g.user['id']))
+            con.execute('DELETE FROM sessions WHERE user_id=?', (g.user['id'],))
+        return jsonify(ok=True)
 
     @web.post('/api/logout')
     def logout():
-        with ledger.connect() as con:
+        with ledger.connect(auth_db) as con:
             con.execute('DELETE FROM sessions WHERE token_hash=?', (g.session_hash,))
         response = jsonify(ok=True)
         response.delete_cookie('session', path='/', secure=secure, httponly=True, samesite='Strict')
@@ -208,7 +264,7 @@ def create_app(password=None, public_url=None):
 
     @web.get('/api/data')
     def data():
-        accounts.reconcile_transfers(dataset_paths[g.dataset])
+        accounts.reconcile_transfers(g.dataset_paths[g.dataset])
         with data_connect() as con:
             transactions = [dict(x) for x in con.execute('SELECT transactions.*, EXISTS(SELECT 1 FROM receipt_images WHERE transaction_id=transactions.id) AS has_receipt FROM transactions ORDER BY date DESC,id DESC')]
             all_items = {}
@@ -266,12 +322,12 @@ def create_app(password=None, public_url=None):
         if not isinstance(data, dict):
             return failure('JSON-Objekt erwartet.')
         if action == 'transaction':
-            result = ledger.save_transaction(data, db=dataset_paths[g.dataset])
+            result = ledger.save_transaction(data, db=g.dataset_paths[g.dataset])
         elif action == 'import-preview':
             columns, rows = ledger.read_csv(data['text'])
             result = {'headers': columns, 'rows': rows[:3], 'count': len(rows)}
         elif action == 'import':
-            result = ledger.import_csv(data, db=dataset_paths[g.dataset])
+            result = ledger.import_csv(data, db=g.dataset_paths[g.dataset])
         elif action == 'ocr':
             result = ledger.recognize(data)
             with data_connect() as con:
@@ -279,17 +335,17 @@ def create_app(password=None, public_url=None):
             for item in result['items']:
                 item['category'] = aliases.get(item['category'], item['category'])
         elif action == 'category-rename':
-            result = ledger.rename_category(data['old_name'], data['name'], db=dataset_paths[g.dataset])
+            result = ledger.rename_category(data['old_name'], data['name'], db=g.dataset_paths[g.dataset])
         elif action == 'account':
-            result = accounts.configure_account(data, dataset_paths[g.dataset])
+            result = accounts.configure_account(data, g.dataset_paths[g.dataset])
         elif action == 'transfer-confirm':
-            result = accounts.confirm_transfer(data, dataset_paths[g.dataset])
+            result = accounts.confirm_transfer(data, g.dataset_paths[g.dataset])
         elif action == 'transfer-reject':
-            result = accounts.reject_transfer(data, dataset_paths[g.dataset])
+            result = accounts.reject_transfer(data, g.dataset_paths[g.dataset])
         elif action == 'transfer-reconsider':
             with data_connect() as con:
                 con.execute('DELETE FROM transfer_ignored WHERE outgoing_id=? AND incoming_id=?', (int(data['outgoing_id']),int(data['incoming_id'])))
-            accounts.reconcile_transfers(dataset_paths[g.dataset])
+            accounts.reconcile_transfers(g.dataset_paths[g.dataset])
             result = {'ok': True}
         elif action == 'payment-method':
             name = data.get('name')

@@ -321,3 +321,56 @@ Ohne Docker kann die App mit `APP_PASSWORD='ein-langes-testpasswort' .venv/bin/p
 Die GitHub-Actions-Pipeline baut das Docker-Image und prüft Anmeldung, CSRF-Schutz, Sitzungsablauf, Passwortwechsel, zwei Geräte, Import, echte Tesseract-OCR, HEIC-Decodierung, Nicht-Root-Ausführung sowie Datenpersistenz nach einem Container-Neustart. Es wird kein Image in eine Registry veröffentlicht; `docker compose up --build` baut es auf dem Zielserver.
 
 Technische Referenzen: [Waitress-Konfiguration](https://docs.pylonsproject.org/projects/waitress/en/latest/arguments.html), [Pillow EXIF-Ausrichtung](https://pillow.readthedocs.io/en/stable/reference/ImageOps.html).
+
+### Mehrere Benutzer und bestehende Daten übernehmen
+
+Nach dem Update zunächst wie bisher mit dem `APP_PASSWORD` anmelden. Unter
+**Einstellungen → Benutzerkonto** einen Benutzernamen und ein neues Passwort
+(mindestens 12 Zeichen) wählen und **Bestehende Daten diesem Konto zuordnen**
+anklicken. Dieses erste Konto wird Administrator und übernimmt unverändert alle
+bisherigen Buchungen, Belege, Kategorien, Kontoeinstellungen und den bisherigen
+Demo-Datensatz. Es ist kein CSV-Import nötig. Vorher eine Sicherung erstellen.
+Alle bisherigen Sitzungen werden beendet; anschließend mit Benutzername und dem
+neu gewählten Passwort anmelden. Die Zuordnung ist einmalig.
+
+Unter **Einstellungen → Benutzer verwalten** kann der Administrator weitere
+Konten anlegen. Jedes Konto hat eigene private Daten und eigene Demo-Daten;
+auch der Administrator sieht in der Finanzansicht ausschließlich seine eigenen
+Daten. Es gibt keine öffentliche Registrierung oder gemeinsame Finanzansicht.
+Benutzernamen sind unabhängig von Groß-/Kleinschreibung. Neue Benutzer erhalten
+keine Kopie der privaten Daten des Administrators.
+
+Nach der Umstellung dient `APP_PASSWORD` nicht mehr zur Anmeldung und ist kein
+Notfallpasswort. Die Variable für die bestehende Compose-Konfiguration beibehalten;
+eine Änderung daran ändert keine Benutzerpasswörter. Eigene Passwörter können
+unter Einstellungen geändert werden; dabei werden die Sitzungen dieses Kontos
+beendet. Vergessene Passwörter kann der Serverbetreiber interaktiv zurücksetzen:
+
+```sh
+docker compose exec app python users.py BENUTZERNAME
+```
+
+Das neue Passwort wird verdeckt abgefragt und nicht als Kommandozeilenargument
+übergeben. Benutzerpasswörter werden nur als gesalzene Hashes gespeichert.
+
+### Vollständiges Backup mit mehreren Benutzern
+
+Die oben beschriebene Sicherung von `expenses.sqlite3` allein enthält nur die
+Daten des ersten Kontos und die Benutzerverwaltung. Weitere Konten liegen unter
+`/data/users/`, Demo-Daten ebenfalls in eigenen Datenbanken. Für eine vollständige
+Sicherung **das gesamte Datenvolume** sichern. Beispielsweise mit kurzem Stopp
+(wie üblich im Repository-Verzeichnis, gegebenenfalls die HTTPS-Compose-Datei ergänzen):
+
+```sh
+umask 077
+docker compose stop app
+docker compose run --rm --no-deps -T --entrypoint python app -c "import sys,tarfile; t=tarfile.open(fileobj=sys.stdout.buffer,mode='w|gz'); t.add('/data',arcname='data'); t.close()" > kassensturz-all-users.tar.gz
+docker compose start app
+```
+
+Exitstatus und Archiv prüfen, bevor die Sicherung extern aufbewahrt wird. Das
+Archiv enthält private Finanzdaten, Belege und Passwort-Hashes. Zur vollständigen
+Wiederherstellung bei gestoppter Anwendung den Inhalt von `data/` aus diesem
+Archiv in ein leeres Datenvolume zurückspielen (Eigentümer UID/GID 10001). Die
+Verzeichnisstruktur einschließlich `users/` muss erhalten bleiben. Eine einzelne
+CSV-Datei ersetzt dieses Backup nicht.

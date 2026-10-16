@@ -13,3 +13,4 @@
 !static/**
 !tests/
 !tests/*.py
+!users.py
