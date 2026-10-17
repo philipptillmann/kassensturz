@@ -1,22 +1,26 @@
-data/*
-!data/.gitkeep
-__pycache__/
-.DS_Store
-.venv/
-.env
-.env.*
-!.env.example
-secrets/
-*.sqlite3*
-*.db
-*.tar.gz
-
 # Android build outputs and machine-local configuration
-android/.gradle/
-android/**/build/
-android/local.properties
-android/.kotlin/
+.gradle/
+.kotlin/
+**/build/
+local.properties
+*.iml
+.idea/
+.DS_Store
+
+# Installers, signing material and private data
 *.apk
 *.aab
 *.jks
 *.keystore
+secrets/
+*.sqlite3*
+*.db
+*.zip
+*.tar.gz
+.env
+.env.*
+
+# Untracked files left by older mixed-branch checkouts
+__pycache__/
+.venv/
+data/

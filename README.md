@@ -1,413 +1,172 @@
-# Kassensturz — Server
+# Kassensturz for Android
 
-Ausgaben, Kategorien und aufgeteilte Rechnungen in einer gemeinsamen Web-App. Laptop und Handy greifen auf dieselbe SQLite-Datenbank zu. Installation mit Docker Compose auf einem NAS, Heimserver, VPS oder Mac mit Docker Desktop.
+[Installationsanleitung auf Deutsch](INSTALL.md)
 
-Der Branch `local` enthält weiterhin die ursprüngliche Mac-Version. Dieser Branch `server` verwendet Flask und Waitress sowie Tesseract statt Apple Vision. Alle angemeldeten Geräte teilen **ein Haushaltskonto**; es gibt keine getrennten Benutzer oder Berechtigungsstufen.
+Branch: `android-standalone`. Native Kotlin Android app, Android 9 (API 28) or
+newer. It runs without Docker, a server, an account or an internet connection.
+The server application continues separately on branch `server`.
 
-## Installation im privaten Netzwerk
+## Repository layout
 
-Voraussetzung: Docker Engine mit Compose v2 oder Docker Desktop. Der Rechner mit Docker muss eingeschaltet bleiben.
+Open this repository's root directly in Android Studio. No `android/` subfolder
+is needed. `app/` contains the native source, resources and tests; `gradle/`,
+`gradlew`, `build.gradle.kts` and `settings.gradle.kts` configure the build.
+`VERSION` is the shared release name, and [INSTALL.md](INSTALL.md) explains phone
+installation. Only the manual Android workflow is included in this branch.
+Docker, Python server code, the web UI, server tests and migration/export tools
+are maintained on `server`.
 
-```sh
-git clone --branch server https://github.com/philipptillmann/kassensturz.git
-cd kassensturz
-cp .env.example .env
-```
+For an existing developer checkout, remove the `android/` prefix from local build
+commands and APK paths. Put `local.properties` in the repository root, or keep
+using `ANDROID_HOME`. The source move leaves the application ID, database names,
+backup format and signing configuration unchanged; it does not migrate or delete
+installed app data. The repository reorganization retains version 0.3.0/code 4.
 
-In `.env` ein eigenes, langes Passwort setzen (mindestens 12 Zeichen):
+## Current app
 
-```dotenv
-APP_PASSWORD='hier-ein-eigenes-langes-passwort-eintragen'
-PORT=8080
-BIND_ADDRESS=0.0.0.0
-PUBLIC_URL=
-DOMAIN=
-```
+- German native interface, monthly overview and twelve-month/category charts.
+- Local SQLite transactions: expense, reimbursement/contribution and income,
+  categories, payment methods, notes, editing and deletion.
+- Category renaming also updates saved entries and receipt positions.
+- Private and demo databases are separate. Demo includes twelve months of data;
+  deleted demo entries do not reappear on restart.
+- Split receipt positions can inherit a transaction group, have their own group,
+  or explicitly stay outside groups. Position totals must equal the transaction.
+- Effective costs combine group contributions in each transaction's own month.
+  Income is reported separately. Shared-account percentages preserve cent totals
+  and can optionally apply to incoming amounts.
+- Internal account transfers: conservative automatic matching when there is
+  unique amount/date/account evidence plus an IBAN or transfer-text hint;
+  ambiguous matches require confirmation. Confirmed legs disappear in effective
+  mode, even across months. A removed match stays ignored until reconsidered.
+- Bank CSV import: comma/semicolon/tab, quoted text, German or ISO dates,
+  German decimal amounts, UTF-8/Windows-1252, column mapping and preview.
+  Deduplication includes the selected account and repeated identical rows.
+  Incoming bank amounts default to reimbursements; classify salary etc. as income
+  explicitly or enable the income option for that import.
+- Original receipt content is kept as JPEG (longest edge at most 3200 px,
+  quality 85, alpha flattened on white). Android ImageDecoder handles rotation
+  and HEIF/HEIC on supported devices. Camera and document-picker imports work
+  without broad photo-library/storage permissions. Originals are replaced by
+  the compressed JPEG, not also retained as a second file.
+- Bundled ML Kit Latin text recognition works offline. OCR text can be reviewed
+  and added to notes; a detected total is optional. OCR does not automatically
+  create item lines, assign categories or infer all receipt fields in this version.
+- Full ZIP backup/restore includes entries, splits, settings, groups, transfer
+  links, ignored pairs and JPEG receipts. Restore is validated in a database
+  transaction; a failed restore leaves the old dataset intact. CSV export is a
+  spreadsheet export, not a complete backup and not a lossless re-import format.
 
-Den Beispieltext durch ein echtes Passwort ersetzen. `.env` wird nicht in Git oder ins Docker-Image aufgenommen. Werte mit `$` oder `#` in einfache Anführungszeichen setzen.
+No Internet permission is granted to the application. No server login or
+multi-user sharing is implemented in this local, single-owner version. Android
+cloud backup and device transfer are excluded; use explicit in-app backups.
 
-```sh
-docker compose up -d --build
-docker compose ps
-```
+## Build and install
 
-- Auf dem Docker-Rechner: `http://localhost:8080`
-- Auf Laptop und Handy im gleichen Netzwerk: `http://SERVER-IP:8080`, z. B. `http://192.168.1.50:8080`
-- Auf beiden Geräten mit demselben Passwort anmelden. Bei Bedarf Port 8080 in der Firewall für das private Netz erlauben.
-
-Das Handy benötigt keine eigene App. „Rechnung scannen“ öffnet die Fotoauswahl bzw. Kamera. Fotos werden zum Server übertragen und für die Texterkennung verarbeitet. Beim Speichern der Buchung wird das Foto als komprimiertes JPEG in der Datenbank archiviert. Änderungen sind beim erneuten Öffnen der Seite bzw. Zurückkehren zum Browser-Tab sichtbar. Bei gleichzeitigem Bearbeiten derselben Buchung gilt die zuletzt gespeicherte Änderung.
-
-Die Standard-Konfiguration verwendet HTTP und ist für ein vertrauenswürdiges privates Netzwerk gedacht. Für Zugriff über das Internet die folgende HTTPS-Variante verwenden. Keine HTTP-Portfreigabe ins Internet einrichten.
-
-### App auf dem iPhone-Home-Bildschirm
-
-In Safari die App-Adresse öffnen und über „Teilen“ → „Zum Home-Bildschirm“
-hinzufügen. Name und Symbol sind als Kassensturz hinterlegt. Nach einem Update
-ein bestehendes Home-Bildschirm-Symbol bei Bedarf entfernen und neu hinzufügen,
-weil iOS das alte Symbol speichern kann. Das entfernt keine Serverdaten.
-Die App benötigt weiterhin eine Verbindung zum Server; es gibt keinen Offline-Modus.
-Für die reguläre PWA-Installation in anderen Browsern HTTPS verwenden.
-
-## HTTPS mit eigener Domain
-
-Die zusätzliche Compose-Datei enthält Caddy für automatische TLS-Zertifikate. Eine Domain muss auf den Server zeigen; TCP-Ports 80 und 443 müssen von außen erreichbar sein. Bei einem Heimserver sind dafür ggf. Router-Portweiterleitungen nötig.
-
-In `.env` das Passwort und die Domain setzen:
-
-```dotenv
-APP_PASSWORD='dein-eigenes-langes-passwort'
-DOMAIN=kassensturz.example.com
-```
-
-Dann **anstelle** der Standard-Konfiguration starten:
-
-```sh
-# Nur beim Wechsel von der HTTP-Installation: den bisherigen Stack anhalten.
-docker compose down
-docker compose -f compose.https.yaml up -d --build
-```
-
-Auf Laptop und Handy `https://kassensturz.example.com` öffnen. Diese Variante veröffentlicht ausschließlich den Reverse Proxy, nicht den App-Port. Beide Compose-Dateien nutzen denselben Projektnamen und dasselbe Daten-Volume. Bei weiteren Befehlen für die HTTPS-Variante immer `-f compose.https.yaml` ergänzen. Caddys Zertifikate liegen in eigenen persistenten Volumes.
-
-Bei einem bereits vorhandenen Reverse Proxy stattdessen in der Standard-Konfiguration `BIND_ADDRESS=127.0.0.1` und `PUBLIC_URL=https://deine-domain.example` setzen. Der Proxy muss den ursprünglichen `Host`-Header erhalten und auf Port 8080 weiterleiten. `PUBLIC_URL` ist eine einzelne Adresse ohne Pfad; danach über genau diese Adresse zugreifen. Secure-Cookies und HSTS werden bei einer HTTPS-Adresse aktiviert. Ungeprüfte Forwarded-Header werden nicht vertraut.
-
-## Funktionen
-
-### Private Daten und Demo-Datensatz
-
-Über „Datensatz“ im Kopfbereich zwischen **Privat** und **Demo · Testdaten**
-wechseln. Die Auswahl gilt pro Browser-Tab; Buchungen, Kategorien, CSV-Importe
-und Exporte gehören immer zum ausgewählten Datensatz. Vor einem Wechsel offene
-Bearbeitungs- oder Importdialoge schließen. Beide Datensätze nutzen dieselbe
-Anmeldung und sind für alle angemeldeten Haushaltsgeräte zugänglich.
-
-Bestehende Daten bleiben unverändert im privaten Datensatz
-(`/data/expenses.sqlite3`). Die Demo liegt separat in `/data/demo.sqlite3` im
-gleichen persistenten Volume. Beim ersten Start werden Beispieldaten aus
-`sample-data/demo.json` angelegt, datiert auf den aktuellen und vorherigen Monat.
-Diese JSON-Datei enthält ausschließlich erfundene Daten und ist in Git enthalten.
-Demo-Buchungen können bearbeitet werden; Updates und Neustarts überschreiben
-diese Änderungen nicht und fügen gelöschte Beispiele nicht wieder hinzu.
-Neue Beispielgruppen können bei einem Update einmalig ergänzt werden. Die
-Diagramm-Beispiele erweitern auch bestehende Demo-Datensätze auf zwölf Monate,
-ohne vorhandene Demo-Buchungen oder private Daten zu ändern.
-Private Datenbanken und `.env` bleiben von Git ausgeschlossen. Für die Entwicklung
-hier den Demo-Datensatz verwenden; private Daten verbleiben auf dem eigenen Server.
-Das oben dokumentierte Backup sichert den privaten Datensatz. Für ein Demo-Backup
-stattdessen `/data/demo.sqlite3` als Quelldatenbank verwenden.
-
-- Monatsübersicht, Suche, eigene Kategorien und CSV-Export.
-- Diagramme: monatliche Beträge, Kategorien, Kategorieverläufe und Händler.
-  Zeitraum, Kategorie und Ausgaben/Gutschriften/Verrechnung sind wählbar.
-  Aufgeteilte Buchungen werden anhand ihrer Positionen ausgewertet; Monate ohne
-  Buchungen erscheinen mit null. Die Diagrammfilter sind unabhängig vom Monat
-  auf der Übersichtsseite. Exakte Monatswerte stehen unter „Werte anzeigen“.
-- CSV-Bankimport mit frei zugeordneten Spalten, UTF-8/Windows-1252 sowie deutscher Betrags- und Datumsdarstellung. Aktuell nur EUR.
-- Eine Buchung lässt sich in einzelne Artikel mit verschiedenen Kategorien aufteilen. Die Positionssumme muss dem Buchungsbetrag entsprechen.
-- OCR auf dem Server mit Tesseract, Deutsch und Englisch. JPEG, PNG, WebP und HEIC; maximal 12 MB und 25 Megapixel. Automatische Ausrichtung anhand der EXIF-Daten.
-- Einfache Stichwortvorschläge für Kategorien. Erkannte Positionen und Beträge vor dem Speichern prüfen. Mehrspaltige Rechnungen benötigen ggf. manuelle Nacharbeit.
-- Eine OCR-Anfrage gleichzeitig; weitere Anfragen erhalten einen Hinweis zum erneuten Versuch. Verarbeitung endet nach maximal 60 Sekunden. Keine Cloud-OCR und keine PDF-Erkennung. Belegfotos werden beim Speichern dauerhaft als JPEG archiviert.
-
-Rechnungen für bereits importierte Umsätze **an der bestehenden Buchung** erfassen, um doppelte Ausgaben zu vermeiden. Bei CSV-Importen werden identische Buchungen anhand Datum, Händler, Betrag und Vorkommensnummer erkannt. Überlappende Teil-Exporte können ohne Bank-ID nicht immer eindeutig abgeglichen werden. Einnahmen werden als Gutschriften angezeigt; Kategorie-Auswertungen zählen positive Positionen vor Erstattungen.
-
-`bank_providers.py` enthält weiterhin die vorbereitete Bankadapter-Schnittstelle. Es ist noch keine Bank direkt angebunden.
-
-### Gruppen und effektive Kosten
-
-In einer Buchung unter „Gruppe“ einen Namen eintragen oder eine vorhandene Gruppe
-wählen. Kauf und Beiträge getrennt erfassen; erhaltene Beiträge sind negative
-Beträge. Zum Beispiel: Amazon 120 €, Beitrag in bar −30 €, PayPal-Beitrag −40 €
-mit dem Gruppennamen „Geburtstagsgeschenk“ ergeben effektiv 50 €.
-
-Die Monatsansicht lässt sich zwischen „Einzelbuchungen“ und „Effektive Kosten“
-umschalten. In der effektiven Ansicht werden die Buchungen einer Gruppe im
-gewählten Monat zu einer Zeile verrechnet; die Monatsbeträge und Kategorieübersicht
-verwenden diese Zeilen. Ungruppierte Buchungen bleiben einzeln sichtbar. Die
-Kategorie einer Gruppe stammt aus ihrer chronologisch ersten positiven Ausgabe.
-Ein Beitrag im Folgemonat bleibt im Folgemonat. Ohne Monatsfilter wird über alle
-Monate verrechnet. Gruppen mit einem Überschuss erscheinen als Gutschrift.
-
-Bei aufgeteilten Rechnungen hat jede Position eine Gruppenauswahl:
-„Buchungsgruppe übernehmen“ erhält die bisherige Zuordnung der gesamten Buchung,
-„Keine Gruppe“ lässt den Artikel einzeln zählen, „Eigene Gruppe“ ordnet nur diesen
-Artikel einem Gruppennamen zu. Unterschiedliche Artikel dürfen in verschiedene
-Gruppen gehören. Die Positionssumme muss weiterhin dem Buchungsbetrag entsprechen.
-
-Beispiel: Amazon 150 € mit Geschenk 90 €, Fahrradlicht 35 € und Küchenzubehör 25 €.
-Nur das Geschenk erhält eine Gruppe. Beiträge von 20 € und 30 € ergeben effektiv
-40 € fürs Geschenk; die übrigen 60 € zählen unverändert separat. Die ursprüngliche
-Amazon-Buchung bleibt in der Einzelansicht eine Buchung über 150 €. CSV exportiert
-den jeweils wirksamen Gruppennamen pro Position.
-
-Eine Gruppenzeile öffnen, um ihre Buchungen bzw. Positionen zu sehen und zu bearbeiten.
-Ein leeres Gruppenfeld löst eine Buchung wieder aus der Gruppe. Namen gelten
-innerhalb des ausgewählten Datensatzes; gleich geschriebene Namen bilden eine
-Gruppe. Die Einzelbuchungen, CSV-Exporte und Diagramme bleiben erhalten; CSV
-enthält zusätzlich den Gruppennamen. Demo enthält ein entsprechendes Geschenkbeispiel.
-
-### Kategorien umbenennen und Zahlungsmittel
-
-Unter „Einstellungen“ eine Kategorie auswählen und ihren Namen ändern. Das
-aktualisiert die Zuordnung in allen Buchungen und Rechnungspositionen des
-gewählten Datensatzes. Ein bereits vorhandener Zielname wird abgelehnt; Kategorien
-werden nicht automatisch zusammengelegt. Auch die Standardkategorien einschließlich
-„Unkategorisiert“ können umbenannt werden. Importe und OCR-Vorschläge verwenden
-danach die umbenannten Standardkategorien.
-
-Unter „Zahlungsmittel“ sind Bar und PayPal vorbereitet; weitere Namen wie ING,
-Sparkasse oder eine bestimmte Karte selbst anlegen. Jede Buchung hat ein optionales
-Zahlungsmittel, das auch für ihre Rechnungspositionen gilt. Alte Buchungen bleiben
-bei „Nicht angegeben“. Beim CSV-Import kann ein Zahlungsmittel für alle neu
-importierten Buchungen ausgewählt werden; übersprungene Duplikate bleiben
-unverändert. Zahlungsmittel erscheinen in der Buchungsliste, Gruppenansicht und
-im CSV-Export. Beide Datensätze haben eigene Listen und Zuordnungen.
-
-### Einnahmen
-
-Beim Erfassen „Buchungstyp → Einnahme“ wählen und den Betrag positiv eingeben.
-Kategorien für Gehalt, Geschenke und sonstige Einnahmen sind vorbereitet und
-können umbenannt oder ergänzt werden. Einnahmen haben ein eigenes Monatstotal und
-eine eigene Auswahl in den Diagrammen. Sie reduzieren keine Ausgaben oder
-Ausgabengruppen. Erstattungen und Kostenbeiträge bleiben „Ausgabe / Erstattung“
-mit negativem Betrag. Bestehende Buchungen behalten diese bisherige Bedeutung;
-importiertes Gehalt kann nachträglich auf Einnahme umgestellt werden. CSV-Exporte
-enthalten den Buchungstyp; intern behalten eingehende Beträge das negative Vorzeichen.
-
-### Notizen
-
-Jede Buchung hat ein optionales Freitextfeld mit bis zu 4000 Zeichen. Notizen
-lassen sich später bearbeiten oder löschen, werden durchsucht und als Text im
-CSV-Export mitgeführt. Die Liste zeigt eine kurze Vorschau; die vollständige
-Notiz steht im Buchungseditor. Notizen gehören zur ursprünglichen Buchung,
-auch bei einer Rechnung mit mehreren Positionen oder Gruppen.
-
-### Gespeicherte Belegfotos
-
-Ein ausgewähltes Foto wird beim Speichern der Buchung als JPEG archiviert, auch
-wenn die Texterkennung fehlschlägt und die Daten manuell eingegeben werden.
-JPEG, PNG, WebP und HEIC werden unterstützt. Das vollständige Foto wird anhand
-seiner EXIF-Ausrichtung gedreht, auf höchstens 3200 Pixel an der längsten Seite
-verkleinert (kleine Bilder werden nicht vergrößert) und mit JPEG-Qualität 85 gespeichert.
-Kamerametadaten werden entfernt. Es gibt keine automatische Beschneidung oder
-starre Dateigrößengrenze nach der Konvertierung, die lange Belege unlesbar machen könnte.
-Die archivierte JPEG-Kopie ersetzt die ursprüngliche Datei, kein unverändertes Original.
-
-Im Buchungseditor „Gespeicherten Beleg ansehen“ wählen. Ein neues Foto ersetzt
-den vorhandenen Beleg erst beim Speichern; „Beleg entfernen“ ebenfalls. Abbrechen
-ändert den gespeicherten Beleg nicht. Pro Buchung wird ein Foto gespeichert.
-Beim Löschen der Buchung wird auch ihr Beleg gelöscht. Bereits früher nur per OCR
-verarbeitete Fotos können nicht nachträglich wiederhergestellt werden.
-
-Fotos liegen mit der Buchung in der SQLite-Datenbank des gewählten Datensatzes.
-Das dokumentierte SQLite-Backup enthält dadurch auch die Bilder; CSV enthält
-keine Bilder. Die Datenbank und ihre Sicherungen benötigen entsprechend mehr Platz.
-
-### Eigene Konten, Gemeinschaftskonten und Umbuchungen
-
-Unter „Einstellungen → Eigene Bankkonten“ für jedes Konto das entsprechende
-Zahlungsmittel auswählen/eintragen. Einzelkonto: 100 %; Gemeinschaftskonto z. B.
-50 %. Eingehende Beträge werden standardmäßig ebenfalls anteilig berücksichtigt;
-diese Option kann pro Konto ausgeschaltet werden. Optional die eigene IBAN
-hinterlegen. Beim CSV-Import das richtige Quellkonto wählen und, falls vorhanden,
-die Spalte mit der Gegenkonto-IBAN zuordnen. Keine Bank-Passwörter erforderlich.
-
-Ein- und Ausgänge auf unterschiedlichen konfigurierten eigenen Konten werden
-als Umbuchung erkannt, wenn ihre Beträge exakt entgegengesetzt sind, die Daten
-höchstens drei Tage auseinanderliegen und die Gegenkonto-IBAN auf ein eigenes
-Konto verweist oder beide Beschreibungen klare Umbuchungs-/Übertragsbegriffe
-enthalten. Nur beidseitig eindeutige Paare werden automatisch bestätigt. Gleiche
-Beträge allein reichen nicht. Unklare Paare erscheinen unter „Umbuchungen“ zur
-Bestätigung. Falsche Zuordnungen dort als normale Buchungen behandeln; diese
-Entscheidung bleibt gespeichert und kann mit „Erneut prüfen“ zurückgenommen werden. Bereits benannten Ausgabengruppen zugeordnete
-Buchungen/Positionen werden nicht automatisch umgebucht.
-
-Die Einzelansicht behält volle Beträge und zeigt bestätigte Umbuchungen an. In
-„Effektive Kosten“ verschwinden beide Transferbuchungen, auch über Monatsgrenzen,
-bevor Kontoanteile berechnet werden. Übrige Buchungen werden mit dem persönlichen
-Anteil gewichtet. Beispiel: 80 € auf einem 50-%-Konto ergeben 40 € persönliche
-Ausgaben. Die Originalbeträge ändern sich nicht. Cent-Rundung erfolgt je Buchung;
-aufgeteilte Positionen werden so verteilt, dass ihre Summe exakt stimmt. Für die
-Diagramme „Berechnung → Eigener Anteil ohne Umbuchungen“ wählen.
-
-Ein noch nicht importiertes Gegenstück bleibt zunächst sichtbar. Kontoeinstellungen
-und Zuordnungen gelten je Datensatz und sind im Datenbank-Backup enthalten.
-Neue CSV-Importe werden je Zahlungsmittel/Konto auf Duplikate geprüft. Bei alten
-Importen ohne Kontozuordnung zuerst die alten Buchungen zuordnen, damit ein
-erneuter Import unter einem anderen Quellkonto keine zusätzlichen Einträge erzeugt.
-Das Demo enthält eine Umbuchung und einen Einkauf auf einem 50-%-Konto.
-
-## Betrieb und Daten
-
-### Updates per SSH / Termius
-
-Für die erste Installation den Branch `server` klonen und `.env` wie oben
-einrichten. Docker Engine mit Compose v2 muss installiert sein; der SSH-Benutzer
-benötigt Zugriff auf Docker. Danach in Termius auf dem Linux-Server ausführen:
+Install JDK 17 and Android SDK platform/build tools 35. Set `ANDROID_HOME` or
+create ignored `local.properties` with `sdk.dir=/path/to/Android/Sdk`.
 
 ```sh
-~/kassensturz/update.sh
-# Bei der HTTPS-Installation stattdessen immer:
-~/kassensturz/update.sh --https
+# Run from the repository root (or open it directly in Android Studio).
+./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
-Den Pfad an den eigenen Installationsordner anpassen. Das Skript funktioniert
-aus jedem Arbeitsverzeichnis, lädt `origin/server` mit Fast-forward-Prüfung,
-baut das Image und wartet bis zu 120 Sekunden auf gesunde Container. Lokale
-Quellcodeänderungen oder ein anderer Branch stoppen das Update. `.env` und das
-Daten-Volume bleiben erhalten. Ein fehlgeschlagener Build lässt die laufende
-App verfügbar; ein fehlgeschlagener Containerstart führt zu einem Fehler, ohne
-automatisch auf die alte Version zurückzurollen. Zur Diagnose
-`docker compose logs --tail=100 app` verwenden (bei HTTPS mit
-`-f compose.https.yaml`). Vor größeren Änderungen ein Backup erstellen.
+APK: `app/build/outputs/apk/debug/app-debug.apk`. Transfer to the phone and open
+it, allowing installation from that source when Android asks. This is a debug
+build for testing. A permanent release signing key and store distribution have
+not been configured. Builds signed with different keys cannot update one another;
+back up before uninstalling a test build. Keep signing keys outside Git.
 
-Entwicklungsablauf: Änderungen hier entwickeln und prüfen, eine funktionierende
-Version nach GitHub auf `server` pushen, das Skript in Termius ausführen und die
-vorhandene App-Adresse im Handy-Browser neu laden. Noch nicht gepushte Änderungen
-sind auf dem Linux-Server nicht verfügbar. Beim ersten Wechsel zwischen HTTP und
-HTTPS die oben beschriebenen Schritte verwenden; das Skript ist für Updates der
-bereits gewählten Installation gedacht.
+GitHub Actions **Android standalone** is manual-only. Request explicit cost
+approval before running it; pushes do not start a build. Download
+`kassensturz-android-debug` from the completed run's Artifacts section and unzip
+it to get `app-debug.apk`. CI runs unit tests, lint and the APK build; device
+testing is done on a physical Android phone. Follow the checklist in
+[INSTALL.md](INSTALL.md#auf-dem-telefon-testen). Camera behavior and HEIC
+readability should be checked on that phone.
+
+## Backups
+
+Under **Mehr**, choose **Vollständige Sicherung erstellen**, select a destination,
+and keep the ZIP outside the app. Restore replaces only the currently selected
+private/demo dataset after confirmation. The archive contains private data and
+is not encrypted. Uninstalling the app removes its local databases and receipts.
+
+Format v1 bounds: 50,000 entries, 2,000 categories/payment methods each, 16 MB
+metadata, 4 MB per compressed JPEG, 512 MB receipt data per dataset. Oversized
+exports fail explicitly; imports use the same limits. Image input is limited to
+24 MB; bank CSV input to 8 MB. ZIP entries are read in memory-bounded chunks,
+never extracted to caller-controlled filesystem paths.
+
+## Move one existing server account to Android
+
+The export utility belongs to the separate `server` branch at
+[`tools/export_android.py`](https://github.com/philipptillmann/kassensturz/blob/server/tools/export_android.py).
+Follow the [server export instructions](https://github.com/philipptillmann/kassensturz/blob/server/README.md#export-one-account-to-android)
+to export exactly one account, read-only, without password hashes or sessions.
+It uses only Python's standard library and can run independently on the server;
+do not switch a running server installation to the Android branch.
+
+Move the resulting ZIP to the phone, select **Privat → Mehr → Sicherung
+wiederherstellen**, and compare transaction counts, balances, split groups and
+receipts before relying on the import. Keep your original server data. This is
+a one-time copy, not synchronization. Server-specific CSV deduplication hashes
+are preserved but differ from newly generated Android import keys; avoid
+re-importing overlapping server bank statements without checking duplicates.
+
+## Verification
 
 ```sh
-docker compose logs --tail=100 app
-docker compose stop
-# Nach Code-Updates:
-git pull --ff-only
-docker compose up -d --build
+# Repository root, only after approval for any potentially metered run:
+./gradlew testDebugUnitTest lintDebug
+# Optional instrumented checks: physical device connected with USB debugging:
+./gradlew connectedDebugAndroidTest
 ```
 
-Daten liegen im Docker-Volume `kassensturz_data` unter `/data/expenses.sqlite3`. Container laufen ohne Root-Rechte, mit schreibgeschütztem Dateisystem und separatem temporären Speicher. Container-Neustarts und neue Images behalten die Daten. **`docker compose down --volumes` löscht die Daten-Volumes**; im normalen Betrieb nur `down` ohne diese Option verwenden.
+Unit tests cover money parsing, groups, month boundaries, partial grouping,
+rounding, shared accounts, CSV parsing and conservative transfer matching.
+Instrumented tests cover real SQLite CRUD, rename, persistence, dataset isolation,
+receipt backup/restore, rollback, CSV deduplication and transfer consistency.
 
-Mit der standardmäßig aktivierten Option „Angemeldet bleiben“ gelten neue Sitzungen
-90 Tage; ohne diese Option sieben Tage. Sitzungen überleben Neustarts und Updates
-und lassen sich pro Gerät abmelden. Bestehende Sitzungen behalten ihre ursprüngliche
-Laufzeit; für 90 Tage einmal abmelden und mit der aktivierten Option neu anmelden.
-Der Browser speichert ein Sitzungscookie, nicht das Passwort. Immer dieselbe
-Serveradresse verwenden: IP-Adresse und Hostname haben getrennte Cookies. Eine Änderung von `APP_PASSWORD` mit anschließendem `docker compose up -d` macht alte Sitzungen ungültig. Alle Geräte müssen sich neu anmelden. Als Alternative zur Umgebungsvariable unterstützt der Server `APP_PASSWORD_FILE`, z. B. für eine gemountete Docker-Secret-Datei. Daten und Passwortkonfiguration sind nicht für andere Benutzer des Servers bestimmt; die Datenbank ist nicht zusätzlich verschlüsselt.
+## Feature delivery and acceptance
 
-### Konsistentes Backup im laufenden Betrieb
+Feature requests are implemented on both `server` and `android-standalone`.
+For every Android app version the publishing assistant creates a GitHub testing
+issue through the GitHub API, including the exact build commit and a checklist
+tailored to the changes. Build retries reuse the issue; documentation-only pushes
+do not create new version issues. If a build is not approved, its APK link remains
+pending. The user completes/closes the issue after physical-device testing.
+This process does not use an Actions job or automatically mark tests as passed.
 
-SQLite-Backup verwenden, damit laufende Schreibvorgänge und WAL-Daten berücksichtigt werden:
+## Shared release version
 
-```sh
-docker compose exec -T app python -c "import sqlite3; s=sqlite3.connect('/data/expenses.sqlite3'); d=sqlite3.connect('/tmp/kassensturz-backup.sqlite3'); s.backup(d); d.close(); s.close()"
-docker compose cp app:/tmp/kassensturz-backup.sqlite3 ./kassensturz-backup.sqlite3
-```
+The current Docker/server and Android release name is **0.3.0**. Both branches
+carry the same root `VERSION` file. Android Gradle reads it for `versionName`;
+the installed app displays its package version. `versionCode` is Android's
+internal upgrade counter and remains separate. The 0.3.0 source uses versionCode 4. Its APK build is pending explicit cost
+approval; the previously published APK remains 0.1.0.
 
-Das Backup außerhalb des Servers aufbewahren. Ein CSV-Export ersetzt kein vollständiges Backup.
+### 0.1.1 — reimbursement entry on mobile keyboards
 
-### Vorhandene lokale Daten übernehmen oder Backup wiederherstellen
+The web editor offers a +/− button beside totals and split-item amounts. Android
+uses Art → Erstattung / Beitrag with a positive total; split-item amounts now
+also have a +/− button. No minus key is needed. Existing signed transactions,
+groups and income accounting retain their meaning.
 
-In einer **neuen Installation mit leerem Daten-Volume**, vor dem ersten Start:
+### 0.2.0 — cash expense shortcut
 
-```sh
-docker compose run --rm --no-deps -T app python -c "import pathlib,sys; p=pathlib.Path('/data/expenses.sqlite3'); assert not p.exists(), 'Datenbank existiert bereits'; p.write_bytes(sys.stdin.buffer.read()); p.chmod(0o600)" < /pfad/zum/kassensturz-backup.sqlite3
-docker compose up -d --build
-```
+On Übersicht, the coin-button **Barausgabe** opens a new expense with **Bar**
+preselected. Enter the amount and description, then save. The selected private/
+demo dataset is retained; opening or cancelling the editor does not create an
+entry. Normal new entries and edits keep their usual payment selection.
+The corresponding server/iPhone overview has the same shortcut.
 
-Vor dem Import muss das Image gebaut sein: `docker compose build`. Für Daten aus dem Branch `local` zuerst die lokale App beenden und deren `data/expenses.sqlite3` sichern. Bestehende Serverdaten nicht überschreiben: zur Wiederherstellung eine separate, leere Installation verwenden und nach der Prüfung umstellen. Die Session-Tabelle wird beim Start ergänzt; vorhandene Buchungen und Kategorien bleiben erhalten.
+### 0.3.0 — Ausgehen category
 
-## Entwicklung und Tests
-
-```sh
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python -m unittest discover -s tests -v
-node --check static/app.js
-node --check static/login.js
-```
-
-Ohne Docker kann die App mit `APP_PASSWORD='ein-langes-testpasswort' .venv/bin/python server.py` gestartet werden. Tesseract samt Sprachpaketen muss dafür separat installiert sein. Die `.env` wird ausschließlich durch Compose eingelesen.
-
-Die GitHub-Actions-Pipeline baut das Docker-Image und prüft Anmeldung, CSRF-Schutz, Sitzungsablauf, Passwortwechsel, zwei Geräte, Import, echte Tesseract-OCR, HEIC-Decodierung, Nicht-Root-Ausführung sowie Datenpersistenz nach einem Container-Neustart. Es wird kein Image in eine Registry veröffentlicht; `docker compose up --build` baut es auf dem Zielserver.
-
-Technische Referenzen: [Waitress-Konfiguration](https://docs.pylonsproject.org/projects/waitress/en/latest/arguments.html), [Pillow EXIF-Ausrichtung](https://pillow.readthedocs.io/en/stable/reference/ImageOps.html).
-
-### Mehrere Benutzer und bestehende Daten übernehmen
-
-Nach dem Update zunächst wie bisher mit dem `APP_PASSWORD` anmelden. Unter
-**Einstellungen → Benutzerkonto** einen Benutzernamen und ein neues Passwort
-(mindestens 12 Zeichen) wählen und **Bestehende Daten diesem Konto zuordnen**
-anklicken. Dieses erste Konto wird Administrator und übernimmt unverändert alle
-bisherigen Buchungen, Belege, Kategorien, Kontoeinstellungen und den bisherigen
-Demo-Datensatz. Es ist kein CSV-Import nötig. Vorher eine Sicherung erstellen.
-Alle bisherigen Sitzungen werden beendet; anschließend mit Benutzername und dem
-neu gewählten Passwort anmelden. Die Zuordnung ist einmalig.
-
-Unter **Einstellungen → Benutzer verwalten** kann der Administrator weitere
-Konten anlegen. Jedes Konto hat eigene private Daten und eigene Demo-Daten;
-auch der Administrator sieht in der Finanzansicht ausschließlich seine eigenen
-Daten. Es gibt keine öffentliche Registrierung oder gemeinsame Finanzansicht.
-Benutzernamen sind unabhängig von Groß-/Kleinschreibung. Neue Benutzer erhalten
-keine Kopie der privaten Daten des Administrators.
-
-Nach der Umstellung dient `APP_PASSWORD` nicht mehr zur Anmeldung und ist kein
-Notfallpasswort. Die Variable für die bestehende Compose-Konfiguration beibehalten;
-eine Änderung daran ändert keine Benutzerpasswörter. Eigene Passwörter können
-unter Einstellungen geändert werden; dabei werden die Sitzungen dieses Kontos
-beendet. Vergessene Passwörter kann der Serverbetreiber interaktiv zurücksetzen:
-
-```sh
-docker compose exec app python users.py BENUTZERNAME
-```
-
-Das neue Passwort wird verdeckt abgefragt und nicht als Kommandozeilenargument
-übergeben. Benutzerpasswörter werden nur als gesalzene Hashes gespeichert.
-
-### Vollständiges Backup mit mehreren Benutzern
-
-Die oben beschriebene Sicherung von `expenses.sqlite3` allein enthält nur die
-Daten des ersten Kontos und die Benutzerverwaltung. Weitere Konten liegen unter
-`/data/users/`, Demo-Daten ebenfalls in eigenen Datenbanken. Für eine vollständige
-Sicherung **das gesamte Datenvolume** sichern. Beispielsweise mit kurzem Stopp
-(wie üblich im Repository-Verzeichnis, gegebenenfalls die HTTPS-Compose-Datei ergänzen):
-
-```sh
-umask 077
-docker compose stop app
-docker compose run --rm --no-deps -T --entrypoint python app -c "import sys,tarfile; t=tarfile.open(fileobj=sys.stdout.buffer,mode='w|gz'); t.add('/data',arcname='data'); t.close()" > kassensturz-all-users.tar.gz
-docker compose start app
-```
-
-Exitstatus und Archiv prüfen, bevor die Sicherung extern aufbewahrt wird. Das
-Archiv enthält private Finanzdaten, Belege und Passwort-Hashes. Zur vollständigen
-Wiederherstellung bei gestoppter Anwendung den Inhalt von `data/` aus diesem
-Archiv in ein leeres Datenvolume zurückspielen (Eigentümer UID/GID 10001). Die
-Verzeichnisstruktur einschließlich `users/` muss erhalten bleiben. Eine einzelne
-CSV-Datei ersetzt dieses Backup nicht.
-
-### Entwicklung auf beiden Plattformen und Freigabe von Kosten
-
-Neue Funktionen werden auf den Branches `server` und `android-standalone`
-umgesetzt. Die GitHub-Actions-Workflows sind ausschließlich manuell startbar;
-Pushes und Pull Requests starten keine Builds oder Tests. Vor jedem potenziell
-kostenpflichtigen Lauf ist eine ausdrückliche Zustimmung erforderlich, auch bei
-vorhandenem Freikontingent. Server-Tests kann der Betreiber selbst durchführen.
-
-Für jede veröffentlichte Android-App-Version legt der veröffentlichende Assistent
-ein GitHub-Issue mit Version, Build-Commit, APK-Link bzw. ausstehendem Build und
-einer Testliste an. Die Erstellung erfolgt über die GitHub-API und benötigt keine
-Actions-Minuten. Getestet wird auf einem echten Gerät. Das Issue bleibt offen,
-bis der Benutzer es nach dem Test manuell abschließt.
-
-### Gemeinsame Versionsnummer
-
-Aktueller gemeinsamer Versionsname: **0.3.0**. Die Datei `VERSION` im Repository-
-Stamm ist die Quelle für Docker/Server und Android und wird auf beiden Branches
-gleich gehalten. Das Docker-Image enthält diese Datei; die Web-App zeigt die
-Version unter Einstellungen an. Android verwendet sie als `versionName`. Der
-interne Android-`versionCode` zählt installierbare Updates unabhängig davon.
-
-### Barausgabe per Schnellwahl (0.2.0)
-
-Auf der Startseite öffnet **Barausgabe** mit Münzsymbol eine neue Ausgabe mit
-vorausgewähltem Zahlungsmittel **Bar**. Betrag und Beschreibung ergänzen und
-speichern. Die Schnellwahl verwendet den ausgewählten Privat-/Demo-Datensatz;
-beim bloßen Öffnen oder Abbrechen wird keine Buchung gespeichert. Das
-Zahlungsmittel kann vor dem Speichern weiterhin geändert werden.
-
-### Kategorie Ausgehen (0.3.0)
-
-**Ausgehen** ist eine Standardkategorie für Getränke in Bar oder Club sowie
-Restaurantbesuche. Sie steht nach dem Update auch in bestehenden Privat- und
-Demo-Datensätzen aller Benutzer zur Auswahl. Bestehende Buchungen werden nicht
-automatisch umkategorisiert. Ein späteres Umbenennen bleibt erhalten.
+**Ausgehen** covers drinks at bars/clubs and meals at restaurants. It is added
+to new databases and to existing private/demo databases during upgrade. Existing
+entries retain their categories; the user can reclassify them manually.
+Legacy backups receive the new default during restore. New backups mark the
+default-category migration so a renamed Ausgehen category stays renamed on
+restore. Server exports retain the same migration marker when the source
+database already knows this default, including a renamed category alias.

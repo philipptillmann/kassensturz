@@ -1,5 +1,5 @@
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
-val appVersion = rootProject.file("../VERSION").readText().trim()
+val appVersion = rootProject.file("VERSION").readText().trim()
 require(Regex("[0-9]+\\.[0-9]+\\.[0-9]+").matches(appVersion)) { "Invalid root VERSION" }
 
 android {
