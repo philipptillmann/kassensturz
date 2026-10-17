@@ -66,6 +66,9 @@ def export(source, output):
             def pairs(table):
                 return [dict(outgoing=r['outgoing_id'], incoming=r['incoming_id']) for r in con.execute('SELECT outgoing_id,incoming_id FROM ' + table)]
             meta = dict(format='kassensturz-android', version=1, categories=categories, payments=payments, entries=entries, accounts=accounts, transfers=pairs('transfer_links'), ignored=pairs('transfer_ignored'))
+            # A renamed server default is still represented by its category alias.
+            if con.execute("SELECT 1 FROM category_aliases WHERE alias='Ausgehen'").fetchone():
+                meta['category_defaults_version'] = 1
             encoded = json.dumps(meta, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
             if len(encoded) > 16_000_000 or len(entries) > 50000 or len(categories) > 2000 or len(payments) > 2000:
                 raise ValueError('Dataset exceeds the Android backup limits.')

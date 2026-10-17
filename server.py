@@ -58,6 +58,13 @@ def create_app(password=None, public_url=None):
     users.init(auth_db)
     dataset_paths = {'private': ledger.DB, 'demo': ledger.DB.parent / 'demo.sqlite3'}
     prepare_demo(dataset_paths['demo'])
+    # Apply additive category/schema migrations to every existing user's datasets.
+    with ledger.connect(auth_db) as con:
+        existing_users = con.execute('SELECT * FROM users WHERE owns_legacy=0').fetchall()
+    for user in existing_users:
+        for path in users.paths(auth_db, user).values():
+            if path.exists():
+                ledger.init(path)
     login_attempts = deque(maxlen=20)
     login_lock = threading.Lock()
 

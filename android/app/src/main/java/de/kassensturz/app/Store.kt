@@ -26,7 +26,7 @@ private fun JSONArray.strings() = (0 until length()).map { getString(it) }
 
 data class Snapshot(val entries: List<Entry>, val categories: List<String>, val payments: List<String>, val accounts: List<Account>, val transfers: List<Transfer>, val ignored: List<Transfer> = emptyList())
 
-class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if (demo) "demo.sqlite3" else "private.sqlite3", null, 1) {
+class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if (demo) "demo.sqlite3" else "private.sqlite3", null, 2) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE categories(name TEXT PRIMARY KEY NOT NULL)")
@@ -36,11 +36,14 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         db.execSQL("CREATE TABLE accounts(name TEXT PRIMARY KEY REFERENCES payments(name),share INTEGER NOT NULL,share_income INTEGER NOT NULL,iban TEXT NOT NULL)")
         db.execSQL("CREATE TABLE transfers(outgoing INTEGER PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE,incoming INTEGER UNIQUE REFERENCES entries(id) ON DELETE CASCADE)")
         db.execSQL("CREATE TABLE ignored(outgoing INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,incoming INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,PRIMARY KEY(outgoing,incoming))")
-        listOf("Unkategorisiert","Lebensmittel","Wohnen","Mobilität","Freizeit","Shopping","Gesundheit","Gehalt","Geschenke","Sonstige Einnahmen").forEach { db.insertOrThrow("categories",null,values("name" to it)) }
+        listOf("Unkategorisiert","Lebensmittel","Wohnen","Mobilität","Freizeit","Ausgehen","Shopping","Gesundheit","Gehalt","Geschenke","Sonstige Einnahmen").forEach { db.insertOrThrow("categories",null,values("name" to it)) }
         listOf("Bar","PayPal","Bankkarte").forEach { db.insertOrThrow("payments",null,values("name" to it)) }
         if (demo) seed(db)
     }
-    override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) { error("Unbekannte Datenbankversion $old → $new") }
+    override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) {
+        require(old >= 1 && new <= 2) { "Unbekannte Datenbankversion $old → $new" }
+        if(old < 2) db.insertWithOnConflict("categories",null,values("name" to "Ausgehen"),SQLiteDatabase.CONFLICT_IGNORE)
+    }
     private fun partsJson(parts: List<Part>) = JSONArray().apply { parts.forEach { p -> put(JSONObject().put("name",p.name).put("amount",p.amount).put("category",p.category).put("group",p.group ?: JSONObject.NULL)) } }.toString()
     private fun parseParts(raw: String) = JSONArray(raw).objects().map { Part(it.getString("name"),it.exactLong("amount"),it.getString("category"),if (it.isNull("group")) null else it.getString("group")) }
     private fun putEntry(db: SQLiteDatabase, e: Entry): Long {
@@ -152,7 +155,7 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         val s=snapshot()
         require(s.entries.size <= 50000 && s.categories.size <= 2000 && s.payments.size <= 2000) { "Datensatz für dieses Sicherungsformat zu groß." }
         readableDatabase.rawQuery("SELECT COALESCE(SUM(length(image)),0) FROM receipts",null).use { c -> c.moveToFirst();require(c.getLong(0)<=512_000_000) { "Belege für dieses Sicherungsformat zu groß (max. 512 MB)." } }
-        val metadata=JSONObject().put("format","kassensturz-android").put("version",1)
+        val metadata=JSONObject().put("format","kassensturz-android").put("version",1).put("category_defaults_version",1)
             .put("categories",JSONArray(s.categories)).put("payments",JSONArray(s.payments))
             .put("entries",JSONArray().apply { s.entries.forEach { put(entryJson(it)) } })
             .put("accounts",JSONArray().apply { s.accounts.forEach { put(JSONObject().put("name",it.name).put("share",it.share).put("share_income",it.shareIncome).put("iban",it.iban)) } })
@@ -170,7 +173,11 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
             require(zip.nextEntry?.name == "data.json") { "Keine Kassensturz-Android-Sicherung." }
             val meta=JSONObject(readLimited(zip,16_000_000).toString(Charsets.UTF_8))
             require(meta.getString("format")=="kassensturz-android" && meta.getInt("version")==1) { "Unbekanntes Sicherungsformat." }
-            val cats=meta.getJSONArray("categories").strings(); val payments=meta.getJSONArray("payments").strings()
+            val cats=meta.getJSONArray("categories").strings().toMutableList()
+            require(cats.isNotEmpty()) { "Ungültige Kategorien in der Sicherung." }
+            // Migrate legacy backups once; modern backups retain renamed defaults.
+            if(meta.optInt("category_defaults_version",0)<1 && "Ausgehen" !in cats) cats.add("Ausgehen")
+            val payments=meta.getJSONArray("payments").strings()
             require(cats.isNotEmpty() && cats.size <= 2000 && payments.size <= 2000 && (cats+payments).all { it.isNotBlank() && it.length <= 60 }) { "Ungültige Kategorien oder Zahlungsmittel." }
             val rows=meta.getJSONArray("entries").objects()
             require(rows.size <= 50000) { "Zu viele Buchungen." }

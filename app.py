@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DB = Path(os.environ.get('DATA_DIR', str(ROOT / 'data'))) / 'expenses.sqlite3'
-CATEGORIES = ['Unkategorisiert', 'Lebensmittel', 'Wohnen', 'Küche & Haushalt', 'Fahrrad', 'Mobilität', 'Shopping', 'Freizeit', 'Gesundheit', 'Abos', 'Reisen', 'Gehalt', 'Geschenke', 'Sonstige Einnahmen']
+CATEGORIES = ['Unkategorisiert', 'Lebensmittel', 'Wohnen', 'Küche & Haushalt', 'Fahrrad', 'Mobilität', 'Shopping', 'Freizeit', 'Ausgehen', 'Gesundheit', 'Abos', 'Reisen', 'Gehalt', 'Geschenke', 'Sonstige Einnahmen']
 
 def connect(db=None):
     con = sqlite3.connect(DB if db is None else db, timeout=15)
