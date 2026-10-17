@@ -1,9 +1,6 @@
 name: Server container
 on:
-  push:
-    branches: [server]
-  pull_request:
-    branches: [server]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

@@ -374,3 +374,17 @@ Wiederherstellung bei gestoppter Anwendung den Inhalt von `data/` aus diesem
 Archiv in ein leeres Datenvolume zurückspielen (Eigentümer UID/GID 10001). Die
 Verzeichnisstruktur einschließlich `users/` muss erhalten bleiben. Eine einzelne
 CSV-Datei ersetzt dieses Backup nicht.
+
+### Entwicklung auf beiden Plattformen und Freigabe von Kosten
+
+Neue Funktionen werden auf den Branches `server` und `android-standalone`
+umgesetzt. Die GitHub-Actions-Workflows sind ausschließlich manuell startbar;
+Pushes und Pull Requests starten keine Builds oder Tests. Vor jedem potenziell
+kostenpflichtigen Lauf ist eine ausdrückliche Zustimmung erforderlich, auch bei
+vorhandenem Freikontingent. Server-Tests kann der Betreiber selbst durchführen.
+
+Für jede veröffentlichte Android-App-Version legt der veröffentlichende Assistent
+ein GitHub-Issue mit Version, Build-Commit, APK-Link bzw. ausstehendem Build und
+einer Testliste an. Die Erstellung erfolgt über die GitHub-API und benötigt keine
+Actions-Minuten. Getestet wird auf einem echten Gerät. Das Issue bleibt offen,
+bis der Benutzer es nach dem Test manuell abschließt.
