@@ -388,3 +388,11 @@ ein GitHub-Issue mit Version, Build-Commit, APK-Link bzw. ausstehendem Build und
 einer Testliste an. Die Erstellung erfolgt über die GitHub-API und benötigt keine
 Actions-Minuten. Getestet wird auf einem echten Gerät. Das Issue bleibt offen,
 bis der Benutzer es nach dem Test manuell abschließt.
+
+### Gemeinsame Versionsnummer
+
+Aktueller gemeinsamer Versionsname: **0.1.0**. Die Datei `VERSION` im Repository-
+Stamm ist die Quelle für Docker/Server und Android und wird auf beiden Branches
+gleich gehalten. Das Docker-Image enthält diese Datei; die Web-App zeigt die
+Version unter Einstellungen an. Android verwendet sie als `versionName`. Der
+interne Android-`versionCode` zählt installierbare Updates unabhängig davon.

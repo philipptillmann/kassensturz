@@ -50,3 +50,16 @@ These are standing user requirements for future work.
   physical-device acceptance. Reference issues without auto-closing keywords.
 - In the delivery message link both branch commits and the Android testing issue;
   state which checks ran and which still need the user's testing/approval.
+
+## Shared release numbering
+
+- The root `VERSION` file is the human-readable release number for both Docker/
+  server and Android. Keep its contents identical on both branches.
+- Android `versionName` reads this file; the server reads the packaged copy for
+  its session metadata and visible version. Do not hardcode another UI version.
+- Android `versionCode` is a separate, monotonically increasing installation
+  counter. It is not a different public release name. Increase it for a new
+  installable Android update; metadata-only changes do not rename old APKs.
+- Name testing issues with the shared version and identify the exact APK build
+  commit separately. Preserve any previous tester results when updating issues.
+- Version alignment does not authorize a build, pipeline, deployment or charge.

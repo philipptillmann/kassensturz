@@ -23,6 +23,7 @@ from receipts import OCRBusy
 
 SESSION_SECONDS = 7 * 24 * 3600
 REMEMBER_SECONDS = 90 * 24 * 3600
+APP_VERSION = (ledger.ROOT / 'VERSION').read_text().strip()
 MAX_BODY = 17_000_000
 
 
@@ -206,7 +207,7 @@ def create_app(password=None, public_url=None):
 
     @web.get('/api/session')
     def session_info():
-        return jsonify(csrf=g.csrf, user=users.public(g.user), needs_migration=g.user is None)
+        return jsonify(csrf=g.csrf, user=users.public(g.user), needs_migration=g.user is None, version=APP_VERSION)
 
     @web.get('/api/auth-status')
     def auth_status():
