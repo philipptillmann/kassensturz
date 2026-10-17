@@ -18,6 +18,7 @@ COPY app.py server.py receipts.py bank_providers.py datasets.py accounts.py user
 COPY sample-data ./sample-data
 COPY static ./static
 COPY tests ./tests
+COPY tools ./tools
 USER 10001:10001
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

@@ -11,6 +11,12 @@ These are standing user requirements for future work.
   limitation or blocker explicitly; do not silently leave one implementation out.
 - Keep the server deployment and standalone Android app independent. Port changes
   deliberately instead of merging all platform-specific files between branches.
+- `android-standalone` is a native Android project at the repository root
+  (`app/`, `gradlew`, `settings.gradle.kts`). Keep server runtime, Docker, web UI,
+  server tests and server migration/export tools only on `server`. The server-to-
+  Android exporter lives at `tools/export_android.py` on `server`.
+- Repository/documentation-only restructuring keeps the existing release version
+  and Android versionCode; it does not publish a new app-code release.
 
 ## Cost approval and testing
 

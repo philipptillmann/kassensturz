@@ -11,7 +11,7 @@ title: '[Android testing] <version> · <app commit>'
 - Exact app/build commit:
 - APK download:
 - Build/cost approval status:
-- Installation guide: [android/INSTALL.md](https://github.com/philipptillmann/kassensturz/blob/android-standalone/android/INSTALL.md)
+- Installation guide: [INSTALL.md](https://github.com/philipptillmann/kassensturz/blob/android-standalone/INSTALL.md)
 
 ## Changes in this version
 

@@ -411,3 +411,41 @@ Zahlungsmittel kann vor dem Speichern weiterhin geändert werden.
 Restaurantbesuche. Sie steht nach dem Update auch in bestehenden Privat- und
 Demo-Datensätzen aller Benutzer zur Auswahl. Bestehende Buchungen werden nicht
 automatisch umkategorisiert. Ein späteres Umbenennen bleibt erhalten.
+
+
+### Export one account to Android
+
+The native app is maintained as a root-level Android project on the separate
+[`android-standalone` branch](https://github.com/philipptillmann/kassensturz/tree/android-standalone).
+The server-side migration tool stays here, at `tools/export_android.py`. It uses
+only Python's standard library, opens source databases read-only and captures a
+consistent SQLite snapshot. It exports exactly one account's financial records
+and receipts, without password hashes or sessions.
+
+Run against the complete data directory on the server host or a restored backup:
+
+```sh
+python3 tools/export_android.py --data-dir /path/to/kassensturz-data \
+  --username YOUR_USERNAME --output /private/path/kassensturz-phone.zip
+```
+
+Use `--legacy` instead of `--username` only for an installation that has never
+migrated to named accounts. `--dataset demo` selects that account's demo dataset;
+private is the default. Existing output files are never overwritten. The data
+directory must include `expenses.sqlite3` and, for additional users, `users/` with
+its original structure. When using a copy, restore a consistent complete backup
+instead of copying live SQLite files while writes are active. The script may
+also be copied and run independently; no Android checkout is needed on the server.
+
+Transfer the ZIP to Android and use **Privat → Mehr → Sicherung wiederherstellen**.
+Restoring replaces the selected local dataset; back up existing phone data first.
+Compare counts, balances, split groups and receipts, and retain the original
+server data. This is a one-time copy, not synchronization. Server CSV import keys
+are preserved but differ from Android's newly generated keys; check duplicates
+before re-importing overlapping statements. The ZIP contains unencrypted private
+data; keep it outside Git and protect its storage and transfer.
+
+Exporter checks now live in `tests/test_android_export.py` and are included in
+the existing server unittest discovery. The export tool itself needs no server
+Python dependencies. As usual, request approval before potentially metered tests
+or workflows; the repository move does not authorize running them.
