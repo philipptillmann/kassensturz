@@ -137,10 +137,10 @@ This process does not use an Actions job or automatically mark tests as passed.
 
 ## Shared release version
 
-The current Docker/server and Android release name is **0.1.1**. Both branches
+The current Docker/server and Android release name is **0.2.0**. Both branches
 carry the same root `VERSION` file. Android Gradle reads it for `versionName`;
 the installed app displays its package version. `versionCode` is Android's
-internal upgrade counter and remains separate. The 0.1.1 source uses versionCode 2. Its APK build is pending explicit cost
+internal upgrade counter and remains separate. The 0.2.0 source uses versionCode 3. Its APK build is pending explicit cost
 approval; the previously published APK remains 0.1.0.
 
 ### 0.1.1 — reimbursement entry on mobile keyboards
@@ -149,3 +149,11 @@ The web editor offers a +/− button beside totals and split-item amounts. Andro
 uses Art → Erstattung / Beitrag with a positive total; split-item amounts now
 also have a +/− button. No minus key is needed. Existing signed transactions,
 groups and income accounting retain their meaning.
+
+### 0.2.0 — cash expense shortcut
+
+On Übersicht, the coin-button **Barausgabe** opens a new expense with **Bar**
+preselected. Enter the amount and description, then save. The selected private/
+demo dataset is retained; opening or cancelling the editor does not create an
+entry. Normal new entries and edits keep their usual payment selection.
+The corresponding server/iPhone overview has the same shortcut.

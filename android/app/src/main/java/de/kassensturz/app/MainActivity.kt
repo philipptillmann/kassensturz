@@ -145,6 +145,16 @@ class MainActivity : Activity() {
     }
     private fun report(period: String?=month.toString())=Ledger.rows(data.entries,period,effective,data.accounts,data.transfers)
     private fun overview() {
+        button(content,"Barausgabe") {
+            edit(null,Bundle().apply { putString("payment","Bar");putString("type","Ausgabe") })
+        }.apply {
+            setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_cash,0,0,0)
+            compoundDrawablePadding=dp(10)
+            gravity=Gravity.CENTER_VERTICAL or Gravity.START
+            setPadding(dp(16),dp(8),dp(16),dp(8))
+            backgroundTintList=android.content.res.ColorStateList.valueOf(Color.rgb(231,238,230))
+            layoutParams=LinearLayout.LayoutParams(-1,dp(56))
+        }
         val totals=Ledger.totals(report())
         val stats=box(content)
         label(stats,"${month.format(DateTimeFormatter.ofPattern("MMMM",Locale.GERMAN))} · ${if(effective) "effektiv" else "alle Buchungen"}",14f,color=muted)
@@ -245,7 +255,7 @@ class MainActivity : Activity() {
         val merchant=field(base,"Bezeichnung",draft?.getString("merchant") ?: original?.merchant ?: "")
         val amount=field(base,"Betrag in Euro (positiv)",draft?.getString("amount") ?: original?.let { amountText(kotlin.math.abs(it.amount)) } ?: "",true)
         val category=select(base,"Kategorie",data.categories,draft?.getString("category") ?: original?.category ?: "Unkategorisiert")
-        val payment=select(base,"Zahlungsmittel",listOf("")+data.payments,draft?.getString("payment") ?: original?.payment)
+        val payment=select(base,"Zahlungsmittel",(listOf("")+data.payments+"Bar").distinct(),draft?.getString("payment") ?: original?.payment)
         val group=field(base,"Gruppe (optional)",draft?.getString("group") ?: original?.group ?: "")
         val notes=field(base,"Notizen",draft?.getString("notes") ?: original?.notes ?: "",lines=3)
         val parts=mutableListOf<Part>().apply { addAll(original?.parts ?: emptyList()) }
@@ -319,7 +329,7 @@ class MainActivity : Activity() {
         val restored=original ?: draft?.getLong("id")?.takeIf { it>0 }?.let { id->data.entries.find { it.id==id } }
         val e=Editor(restored,draft);editor=e
         val scroll=ScrollView(this).apply { addView(e.base) }
-        val window=AlertDialog.Builder(this).setTitle(if(restored==null)"Neue Buchung" else "Buchung bearbeiten").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create()
+        val window=AlertDialog.Builder(this).setTitle(if(restored!=null)"Buchung bearbeiten" else if(e.payment.selectedItem=="Bar")"Neue Barausgabe" else "Neue Buchung").setView(scroll).setNegativeButton("Abbrechen",null).setPositiveButton("Speichern",null).create()
         e.window=window
         window.setOnShowListener { window.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { if(!busy)try { val entry=e.entry();val file=e.photo
             work({store.save(entry,file?.readBytes(),e.removeReceipt);store.snapshot()}) { data=it;file?.delete();editor=null;window.dismiss();screen() }
