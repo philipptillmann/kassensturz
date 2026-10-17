@@ -272,6 +272,11 @@ class MainActivity : Activity() {
         }
         fun partDialog(index: Int?) {
             val old=index?.let { parts[it] };val f=form();val name=field(f,"Position",old?.name ?: "");val value=field(f,"Betrag (Vorzeichen wie Buchung)",old?.let { amountText(it.amount) } ?: "",true)
+            button(f,"+/− Vorzeichen wechseln") {
+                val raw=value.text.toString().trim().removePrefix("+")
+                val signed=if(raw.startsWith("-")) raw.removePrefix("-") else "-"+raw
+                value.setText(signed);value.setSelection(signed.length);value.requestFocus()
+            }
             val cat=select(f,"Kategorie",data.categories,old?.category ?: category.selectedItem?.toString())
             val mode=select(f,"Gruppenzuordnung",listOf("Gruppe der Buchung erben","Keine Gruppe","Eigene Gruppe"),when { old?.group==null->"Gruppe der Buchung erben";old.group.isEmpty()->"Keine Gruppe";else->"Eigene Gruppe" })
             val g=field(f,"Eigener Gruppenname",old?.group ?: "")

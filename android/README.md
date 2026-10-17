@@ -137,8 +137,15 @@ This process does not use an Actions job or automatically mark tests as passed.
 
 ## Shared release version
 
-The current Docker/server and Android release name is **0.1.0**. Both branches
+The current Docker/server and Android release name is **0.1.1**. Both branches
 carry the same root `VERSION` file. Android Gradle reads it for `versionName`;
 the installed app displays its package version. `versionCode` is Android's
-internal upgrade counter and remains separate. The existing 0.1.0 APK already
-has the aligned name; no rebuild is needed solely to change that name.
+internal upgrade counter and remains separate. The 0.1.1 source uses versionCode 2. Its APK build is pending explicit cost
+approval; the previously published APK remains 0.1.0.
+
+### 0.1.1 — reimbursement entry on mobile keyboards
+
+The web editor offers a +/− button beside totals and split-item amounts. Android
+uses Art → Erstattung / Beitrag with a positive total; split-item amounts now
+also have a +/− button. No minus key is needed. Existing signed transactions,
+groups and income accounting retain their meaning.

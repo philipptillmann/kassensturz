@@ -391,7 +391,7 @@ bis der Benutzer es nach dem Test manuell abschließt.
 
 ### Gemeinsame Versionsnummer
 
-Aktueller gemeinsamer Versionsname: **0.1.0**. Die Datei `VERSION` im Repository-
+Aktueller gemeinsamer Versionsname: **0.1.1**. Die Datei `VERSION` im Repository-
 Stamm ist die Quelle für Docker/Server und Android und wird auf beiden Branches
 gleich gehalten. Das Docker-Image enthält diese Datei; die Web-App zeigt die
 Version unter Einstellungen an. Android verwendet sie als `versionName`. Der
