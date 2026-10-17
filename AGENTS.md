@@ -63,3 +63,7 @@ These are standing user requirements for future work.
 - Name testing issues with the shared version and identify the exact APK build
   commit separately. Preserve any previous tester results when updating issues.
 - Version alignment does not authorize a build, pipeline, deployment or charge.
+
+- Assign a new shared version for every feature or fix: minor for new features
+  (0.1.0 → 0.2.0), patch for fixes (0.2.0 → 0.2.1), major for breaking changes.
+  Update VERSION on both branches and the version-specific Android testing issue.
