@@ -1,4 +1,7 @@
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
+val appVersion = rootProject.file("../VERSION").readText().trim()
+require(Regex("[0-9]+\\.[0-9]+\\.[0-9]+").matches(appVersion)) { "Invalid root VERSION" }
+
 android {
     namespace = "de.kassensturz.app"
     compileSdk = 35
@@ -7,7 +10,7 @@ android {
         minSdk = 28
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = appVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

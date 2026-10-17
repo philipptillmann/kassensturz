@@ -12,7 +12,7 @@ RUN apt-get update \
     && useradd --uid 10001 --gid 10001 --no-create-home kassensturz \
     && mkdir /data && chown 10001:10001 /data
 WORKDIR /app
-COPY requirements.txt ./
+COPY requirements.txt VERSION ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py ./
 COPY sample-data ./sample-data

@@ -134,3 +134,11 @@ tailored to the changes. Build retries reuse the issue; documentation-only pushe
 do not create new version issues. If a build is not approved, its APK link remains
 pending. The user completes/closes the issue after physical-device testing.
 This process does not use an Actions job or automatically mark tests as passed.
+
+## Shared release version
+
+The current Docker/server and Android release name is **0.1.0**. Both branches
+carry the same root `VERSION` file. Android Gradle reads it for `versionName`;
+the installed app displays its package version. `versionCode` is Android's
+internal upgrade counter and remains separate. The existing 0.1.0 APK already
+has the aligned name; no rebuild is needed solely to change that name.

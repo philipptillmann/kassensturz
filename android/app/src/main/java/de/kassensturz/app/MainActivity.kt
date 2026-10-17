@@ -227,7 +227,7 @@ class MainActivity : Activity() {
         button(files,"Vollständige Sicherung erstellen") { pendingDataset=demo;createDocument(101,"application/zip","kassensturz-${if(demo) "demo" else "privat"}-${LocalDate.now()}.zip") }
         button(files,"Sicherung wiederherstellen") { pendingDataset=demo;openDocument(103,"application/zip") }
         label(files,"Sicherungen enthalten den ausgewählten Datensatz einschließlich Belegen. Wiederherstellen ersetzt diesen Datensatz. CSV enthält keine Bilder.",13f,color=muted)
-        val info=box(content);label(info,"Kassensturz für Android",20f,true);label(info,"Version 0.1.0 · Alle Daten auf diesem Gerät",14f,color=muted)
+        val info=box(content);label(info,"Kassensturz für Android",20f,true);label(info,"Version ${packageManager.getPackageInfo(packageName,0).versionName} · Alle Daten auf diesem Gerät",14f,color=muted)
     }
     private fun nameDialog(category: Boolean) { val f=form();val name=field(f,"Name");dialog(if(category)"Kategorie anlegen" else "Zahlungsmittel anlegen",f) { val value=name.text.toString();require(value.trim().isNotEmpty()) { "Name fehlt." };change({store.addName(value,category)}) } }
     private fun accountDialog(account: Account?) {
