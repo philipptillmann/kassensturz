@@ -1,65 +1,124 @@
 # Kassensturz for Android
 
-Development branch: `android-standalone`, based on server commit
-`120ccba5d10927f6fc66cefb6f79bc3227363813`.
+[Installationsanleitung auf Deutsch](INSTALL.md)
 
-## Goal
+Branch: `android-standalone`. Native Kotlin Android app, Android 9 (API 28) or
+newer. It runs without Docker, a server, an account or an internet connection.
+The server application continues separately on branch `server`.
 
-An installable Android application that works without Docker, a server, or an
-internet connection. The existing server application remains on branch `server`.
-This branch currently contains the server source and this development plan;
-there is no Android application or APK yet.
+## Current app
 
-## Proposed implementation
+- German native interface, monthly overview and twelve-month/category charts.
+- Local SQLite transactions: expense, reimbursement/contribution and income,
+  categories, payment methods, notes, editing and deletion.
+- Category renaming also updates saved entries and receipt positions.
+- Private and demo databases are separate. Demo includes twelve months of data;
+  deleted demo entries do not reappear on restart.
+- Split receipt positions can inherit a transaction group, have their own group,
+  or explicitly stay outside groups. Position totals must equal the transaction.
+- Effective costs combine group contributions in each transaction's own month.
+  Income is reported separately. Shared-account percentages preserve cent totals
+  and can optionally apply to incoming amounts.
+- Internal account transfers: conservative automatic matching when there is
+  unique amount/date/account evidence plus an IBAN or transfer-text hint;
+  ambiguous matches require confirmation. Confirmed legs disappear in effective
+  mode, even across months. A removed match stays ignored until reconsidered.
+- Bank CSV import: comma/semicolon/tab, quoted text, German or ISO dates,
+  German decimal amounts, UTF-8/Windows-1252, column mapping and preview.
+  Deduplication includes the selected account and repeated identical rows.
+  Incoming bank amounts default to reimbursements; classify salary etc. as income
+  explicitly or enable the income option for that import.
+- Original receipt content is kept as JPEG (longest edge at most 3200 px,
+  quality 85, alpha flattened on white). Android ImageDecoder handles rotation
+  and HEIF/HEIC on supported devices. Camera and document-picker imports work
+  without broad photo-library/storage permissions. Originals are replaced by
+  the compressed JPEG, not also retained as a second file.
+- Bundled ML Kit Latin text recognition works offline. OCR text can be reviewed
+  and added to notes; a detected total is optional. OCR does not automatically
+  create item lines, assign categories or infer all receipt fields in this version.
+- Full ZIP backup/restore includes entries, splits, settings, groups, transfer
+  links, ignored pairs and JPEG receipts. Restore is validated in a database
+  transaction; a failed restore leaves the old dataset intact. CSV export is a
+  spreadsheet export, not a complete backup and not a lossless re-import format.
 
-- Kotlin with Jetpack Compose for the German interface.
-- Room over SQLite for transactions, split items, categories, payment methods,
-  expense groups, account shares, transfer matches and dataset metadata.
-- App-private files for compressed JPEG receipts, with database references and
-  transactional cleanup. OCR must run on device with bundled recognition models
-  so first-use scanning also works offline.
-- Android photo picker / camera integration; verify HEIC decoding on supported
-  Android versions, normalize orientation, and check compression readability.
-- Private and synthetic demo datasets stored separately.
-- No server login dependency. Android device security protects the initial
-  single-owner installation. Multiple local profiles or a separate app lock
-  require a deliberate design; server account passwords must not be copied.
-- Explicit user-controlled export, backup and restore through Android's document
-  picker. Full backups must include receipts, schema version and all local data;
-  CSV alone is not a complete backup. Decide and configure Android automatic
-  backup behavior before distributing builds with real data.
+No Internet permission is granted to the application. No server login or
+multi-user sharing is implemented in this local, single-owner version. Android
+cloud backup and device transfer are excluded; use explicit in-app backups.
 
-## Delivery milestones
+## Build and install
 
-1. Buildable Android project and installable debug APK: local database,
-   transaction create/edit/delete, categories, payment methods, separate
-   income/expenses, notes, monthly totals and demo/private selection.
-2. Port and test split receipts, expense groups, effective costs, shared-account
-   percentages, transfer matching and charts against the existing synthetic
-   Python/JavaScript fixtures. Keep cents as integers and preserve rounding and
-   cross-month rules.
-3. Local receipt capture, JPEG conversion/storage and bundled offline OCR.
-4. Bank CSV import with account-scoped deduplication, full backup/restore and
-   migration from a selected server account.
-5. Device testing, stable package identifier and release signing, then a
-   release APK. Signing secrets stay outside Git.
+Install JDK 17 and Android SDK platform/build tools 35. Set `ANDROID_HOME` or
+create ignored `local.properties` with `sdk.dir=/path/to/Android/Sdk`.
 
-## Existing data migration
+```sh
+cd android
+./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
+```
 
-Do not copy a complete multi-user server database into the phone: the root
-SQLite database also contains authentication data. Implement an authenticated
-export restricted to the selected account, including its private data, settings,
-splits, receipt images and schema metadata. Exclude other accounts, sessions and
-password hashes. Validate the archive and import atomically into a new local
-dataset, preserving IDs/links and comparing counts, totals and receipt checksums.
-Retain the server data until the user verifies the import. No migration code
-exists yet.
+APK: `app/build/outputs/apk/debug/app-debug.apk`. Transfer to the phone and open
+it, allowing installation from that source when Android asks. This is a debug
+build for testing. A permanent release signing key and store distribution have
+not been configured. Builds signed with different keys cannot update one another;
+back up before uninstalling a test build. Keep signing keys outside Git.
 
-## Acceptance criteria
+GitHub Actions **Android standalone** builds the APK on this branch. Download
+`kassensturz-android-debug` from the completed run's Artifacts section and unzip
+it to get `app-debug.apk`. The device-test job runs the database and startup tests
+on an Android 35 emulator. Hardware-camera behavior and HEIC readability still
+need testing on real phones.
 
-- Installation and everyday operation require no server address or Docker.
-- Airplane-mode tests cover entering/editing transactions, charts and receipt OCR.
-- Effective totals match the existing grouping, refund, income, transfer and
-  shared-account tests, including month boundaries.
-- Full backup/restore reproduces totals, settings, links and readable receipts.
-- The server deployment workflow and branch remain independent.
+## Backups
+
+Under **Mehr**, choose **Vollständige Sicherung erstellen**, select a destination,
+and keep the ZIP outside the app. Restore replaces only the currently selected
+private/demo dataset after confirmation. The archive contains private data and
+is not encrypted. Uninstalling the app removes its local databases and receipts.
+
+Format v1 bounds: 50,000 entries, 2,000 categories/payment methods each, 16 MB
+metadata, 4 MB per compressed JPEG, 512 MB receipt data per dataset. Oversized
+exports fail explicitly; imports use the same limits. Image input is limited to
+24 MB; bank CSV input to 8 MB. ZIP entries are read in memory-bounded chunks,
+never extracted to caller-controlled filesystem paths.
+
+## Move one existing server account to Android
+
+`export_server.py` uses only Python's standard library. Run it as the server
+operator against the data directory, or against a complete restored backup.
+It opens source databases read-only, captures a consistent SQLite snapshot,
+selects exactly one account and writes no sessions or password hashes.
+
+```sh
+python3 android/export_server.py --data-dir /path/to/kassensturz-data \
+  --username YOUR_USERNAME --output /private/path/kassensturz-phone.zip
+```
+
+For a server that has never migrated to named accounts, use `--legacy` instead
+of `--username`. `--dataset demo` explicitly exports that account's demo data;
+private is the default. Existing output files are never overwritten.
+
+The data directory must include `expenses.sqlite3` and, for additional users,
+the `users/` directory with its original structure. If using a copy, use a
+consistent server backup instead of copying SQLite files while writes are active.
+The script can also be copied to the server and run independently; switching
+your server's Git branch or deploying the Android branch is unnecessary.
+
+Move the resulting ZIP to the phone, select **Privat → Mehr → Sicherung
+wiederherstellen**, and compare transaction counts, balances, split groups and
+receipts before relying on the import. Keep your original server data. This is
+a one-time copy, not synchronization. Server-specific CSV deduplication hashes
+are preserved but differ from newly generated Android import keys; avoid
+re-importing overlapping server bank statements without checking duplicates.
+
+## Verification
+
+```sh
+# Repository root, with the existing Python dependencies installed:
+python -m unittest discover -s android/tests -v
+# Android project, emulator/device connected:
+./gradlew connectedDebugAndroidTest
+```
+
+Unit tests cover money parsing, groups, month boundaries, partial grouping,
+rounding, shared accounts, CSV parsing and conservative transfer matching.
+Instrumented tests cover real SQLite CRUD, rename, persistence, dataset isolation,
+receipt backup/restore, rollback, CSV deduplication and transfer consistency.

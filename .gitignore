@@ -10,3 +10,13 @@ secrets/
 *.sqlite3*
 *.db
 *.tar.gz
+
+# Android build outputs and machine-local configuration
+android/.gradle/
+android/**/build/
+android/local.properties
+android/.kotlin/
+*.apk
+*.aab
+*.jks
+*.keystore
