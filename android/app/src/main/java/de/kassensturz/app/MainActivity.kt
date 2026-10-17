@@ -44,6 +44,8 @@ class MainActivity : Activity() {
     private var month=YearMonth.now()
     private var tab=0
     private var busy=false
+    private var initialLoad=true
+    private var deferredResult: Triple<Int,Int,Intent?>?=null
     private var editor: Editor?=null
     private var cameraFile: File?=null
     private var pendingDataset: Boolean?=null
@@ -64,7 +66,8 @@ class MainActivity : Activity() {
         val draft=savedInstanceState?.getBundle("draft")
         store=Store(this,demo)
         screen()
-        work({store.snapshot()}) { data=it;screen();if(draft!=null) edit(null,draft) }
+        work({store.snapshot()}) { data=it;screen();initialLoad=false;if(draft!=null) edit(null,draft)
+            deferredResult?.let { (code,result,intent)->deferredResult=null;onActivityResult(code,result,intent) } }
     }
     override fun onSaveInstanceState(out: Bundle) {
         super.onSaveInstanceState(out)
@@ -297,7 +300,7 @@ class MainActivity : Activity() {
             val recognizer=TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
             busy=true
             recognizer.process(InputImage.fromBitmap(bitmap,0)).addOnSuccessListener { text ->
-                if(!isDestroyed) {
+                if(!isDestroyed && editor===this@Editor) {
                     val f=form();val result=field(f,"Erkannter Text – bitte prüfen",text.text,lines=6)
                     val total=Regex("(?im)(?:summe|gesamt|total)[^\\n]*?([0-9]+[,.][0-9]{2})").find(text.text)?.groupValues?.get(1)
                     val choice=check(f,"Erkannten Gesamtbetrag übernehmen${total?.let { " ($it €)" } ?: " (nicht gefunden)"}",false);choice.isEnabled=total!=null
@@ -332,6 +335,7 @@ class MainActivity : Activity() {
     }
     override fun onActivityResult(requestCode:Int,resultCode:Int,result:Intent?) {
         super.onActivityResult(requestCode,resultCode,result)
+        if(initialLoad) { deferredResult=Triple(requestCode,resultCode,result);return }
         if(resultCode!=RESULT_OK)return
         val uri=if(requestCode==111)cameraFile?.let(Uri::fromFile) else result?.data
         if(uri==null)return

@@ -24,11 +24,11 @@ class LaunchTest {
             instrumentation.waitForIdleSync()
             val deadline=System.currentTimeMillis()+10000
             while(System.currentTimeMillis()<deadline) {
-                var ready=false;instrumentation.runOnMainSync { ready=find(a.window.decorView,"+ Buchung")!=null }
+                var ready=false;instrumentation.runOnMainSync { find(a.window.decorView,"Mehr")?.performClick();ready=find(a.window.decorView,"Vollständige Sicherung erstellen")!=null }
                 if(ready)break
                 Thread.sleep(100)
             }
-            instrumentation.runOnMainSync { assertNotNull(find(a.window.decorView,"Kassensturz"));find(a.window.decorView,"Mehr")!!.performClick() }
+            instrumentation.runOnMainSync { assertNotNull(find(a.window.decorView,"Kassensturz")) }
             instrumentation.waitForIdleSync()
             instrumentation.runOnMainSync { assertNotNull(find(a.window.decorView,"Vollständige Sicherung erstellen")) }
             assertFalse(a.packageManager.getPackageInfo(a.packageName,android.content.pm.PackageManager.GET_PERMISSIONS).requestedPermissions?.contains("android.permission.INTERNET") ?: false)
