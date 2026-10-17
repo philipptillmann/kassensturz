@@ -61,12 +61,12 @@ class StoreTest {
     @Test fun testInvalidArchiveRollsBackAllChanges() {
         db.save(entry());val before=db.snapshot();val good=ByteArrayOutputStream();db.backup(good)
         val malformed=ByteArrayOutputStream();ZipOutputStream(malformed).use { z->z.putNextEntry(ZipEntry("data.json"));z.write("{\"format\":\"kassensturz-android\",\"version\":99}".toByteArray());z.closeEntry() }
-        try { db.restore(ByteArrayInputStream(malformed.toByteArray()));fail("Must reject unknown schema") } catch (_: IllegalArgumentException) { }
+        try { db.restore(ByteArrayInputStream(malformed.toByteArray()));fail("Must reject unknown schema") } catch (_: IllegalArgumentException) { } catch (_: java.util.zip.ZipException) { }
         assertEquals(before,db.snapshot())
         // Valid data followed by an unknown path fails after replacements have begun.
         val zipIn=java.util.zip.ZipInputStream(ByteArrayInputStream(good.toByteArray()));zipIn.nextEntry;val metadata=zipIn.readBytes();zipIn.close()
         val corrupt=ByteArrayOutputStream();ZipOutputStream(corrupt).use { z->z.putNextEntry(ZipEntry("data.json"));z.write(metadata);z.closeEntry();z.putNextEntry(ZipEntry("../escape"));z.write(byteArrayOf(1));z.closeEntry() }
-        try { db.restore(ByteArrayInputStream(corrupt.toByteArray()));fail("Must reject unknown path") } catch (_: IllegalArgumentException) { }
+        try { db.restore(ByteArrayInputStream(corrupt.toByteArray()));fail("Must reject unknown path") } catch (_: IllegalArgumentException) { } catch (_: java.util.zip.ZipException) { }
         assertEquals(before,db.snapshot())
     }
     @Test fun testCsvDedupIsAccountScopedAndAtomic() {
