@@ -52,7 +52,7 @@ create ignored `local.properties` with `sdk.dir=/path/to/Android/Sdk`.
 
 ```sh
 cd android
-./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest
+./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`. Transfer to the phone and open
@@ -63,9 +63,10 @@ back up before uninstalling a test build. Keep signing keys outside Git.
 
 GitHub Actions **Android standalone** builds the APK on this branch. Download
 `kassensturz-android-debug` from the completed run's Artifacts section and unzip
-it to get `app-debug.apk`. The device-test job runs the database and startup tests
-on an Android 35 emulator. Hardware-camera behavior and HEIC readability still
-need testing on real phones.
+it to get `app-debug.apk`. CI runs unit tests, lint and the APK build; device
+testing is done on a physical Android phone. Follow the checklist in
+[INSTALL.md](INSTALL.md#auf-dem-telefon-testen). Camera behavior and HEIC
+readability should be checked on that phone.
 
 ## Backups
 
@@ -114,7 +115,7 @@ re-importing overlapping server bank statements without checking duplicates.
 ```sh
 # Repository root, with the existing Python dependencies installed:
 python -m unittest discover -s android/tests -v
-# Android project, emulator/device connected:
+# Optional instrumented checks: Android project, physical device connected with USB debugging:
 ./gradlew connectedDebugAndroidTest
 ```
 

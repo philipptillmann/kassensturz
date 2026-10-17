@@ -52,3 +52,22 @@ Das Foto wird als komprimiertes JPEG mit der Buchung gespeichert.
 **Text aus Beleg lesen** erkennt Text lokal. Ergebnis prüfen und in die Notizen
 übernehmen; ein erkannter Gesamtbetrag kann optional übernommen werden.
 HEIC-Unterstützung hängt vom Bilddecoder des Android-Geräts ab.
+
+## Auf dem Telefon testen
+
+Für den ersten Durchlauf **Demo** auswählen:
+
+1. **Übersicht**, **Diagramme** und **Buchungen** öffnen und zwischen Monaten wechseln.
+2. Eine Ausgabe, eine Erstattung und eine Einnahme anlegen. Einen Eintrag bearbeiten und löschen.
+3. Eine Ausgabe und eine Erstattung derselben Gruppe zuordnen. **Effektive Kosten** einschalten und die Summe prüfen.
+4. Eine Buchung in Positionen aufteilen. Nur einer Position eine Gruppe geben und die übrige Position außerhalb der Gruppe lassen.
+5. Ein eigenes Konto mit 50 % Anteil konfigurieren. Eine Buchung mit diesem Zahlungsmittel erfassen und die effektive Summe prüfen.
+6. Einen Beleg fotografieren, speichern, erneut öffnen und die Lesbarkeit prüfen. Auch ein HEIC-Bild aus der Dateien-App ausprobieren, falls vorhanden.
+7. **Text aus Beleg lesen** ausprobieren und das Ergebnis prüfen.
+8. Flugmodus einschalten, die App neu öffnen und Buchungen sowie OCR erneut testen.
+9. Eine vollständige Demo-Sicherung erstellen. Danach einen Eintrag ändern und die Sicherung zurückspielen; Beträge und Beleg müssen wieder vorhanden sein.
+10. Zwischen **Demo** und **Privat** wechseln und prüfen, dass die Daten getrennt bleiben.
+
+Fehler bitte mit Android-Version, Gerätemodell und den Schritten zum Nachstellen
+melden. Bei Screenshots aus dem privaten Datensatz sensible Angaben ausblenden.
+Für das Testen per APK sind kein Computer, Emulator oder USB-Debugging erforderlich.
