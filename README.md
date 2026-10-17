@@ -391,7 +391,7 @@ bis der Benutzer es nach dem Test manuell abschließt.
 
 ### Gemeinsame Versionsnummer
 
-Aktueller gemeinsamer Versionsname: **0.2.0**. Die Datei `VERSION` im Repository-
+Aktueller gemeinsamer Versionsname: **0.3.0**. Die Datei `VERSION` im Repository-
 Stamm ist die Quelle für Docker/Server und Android und wird auf beiden Branches
 gleich gehalten. Das Docker-Image enthält diese Datei; die Web-App zeigt die
 Version unter Einstellungen an. Android verwendet sie als `versionName`. Der
@@ -404,3 +404,10 @@ vorausgewähltem Zahlungsmittel **Bar**. Betrag und Beschreibung ergänzen und
 speichern. Die Schnellwahl verwendet den ausgewählten Privat-/Demo-Datensatz;
 beim bloßen Öffnen oder Abbrechen wird keine Buchung gespeichert. Das
 Zahlungsmittel kann vor dem Speichern weiterhin geändert werden.
+
+### Kategorie Ausgehen (0.3.0)
+
+**Ausgehen** ist eine Standardkategorie für Getränke in Bar oder Club sowie
+Restaurantbesuche. Sie steht nach dem Update auch in bestehenden Privat- und
+Demo-Datensätzen aller Benutzer zur Auswahl. Bestehende Buchungen werden nicht
+automatisch umkategorisiert. Ein späteres Umbenennen bleibt erhalten.
