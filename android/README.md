@@ -61,7 +61,8 @@ build for testing. A permanent release signing key and store distribution have
 not been configured. Builds signed with different keys cannot update one another;
 back up before uninstalling a test build. Keep signing keys outside Git.
 
-GitHub Actions **Android standalone** builds the APK on this branch. Download
+GitHub Actions **Android standalone** is manual-only. Request explicit cost
+approval before running it; pushes do not start a build. Download
 `kassensturz-android-debug` from the completed run's Artifacts section and unzip
 it to get `app-debug.apk`. CI runs unit tests, lint and the APK build; device
 testing is done on a physical Android phone. Follow the checklist in
@@ -123,3 +124,13 @@ Unit tests cover money parsing, groups, month boundaries, partial grouping,
 rounding, shared accounts, CSV parsing and conservative transfer matching.
 Instrumented tests cover real SQLite CRUD, rename, persistence, dataset isolation,
 receipt backup/restore, rollback, CSV deduplication and transfer consistency.
+
+## Feature delivery and acceptance
+
+Feature requests are implemented on both `server` and `android-standalone`.
+For every Android app version the publishing assistant creates a GitHub testing
+issue through the GitHub API, including the exact build commit and a checklist
+tailored to the changes. Build retries reuse the issue; documentation-only pushes
+do not create new version issues. If a build is not approved, its APK link remains
+pending. The user completes/closes the issue after physical-device testing.
+This process does not use an Actions job or automatically mark tests as passed.

@@ -3,6 +3,9 @@
 Voraussetzung: Android 9 oder neuer. Die App speichert ihre Daten auf dem Telefon
 und funktioniert auch im Flugmodus.
 
+Neue Builds werden erst nach ausdrücklicher Zustimmung zu möglichen Kosten
+gestartet. Ein Push allein erzeugt keine neue APK.
+
 ## APK herunterladen
 
 1. Auf GitHub [Actions → Android standalone](https://github.com/philipptillmann/kassensturz/actions/workflows/android.yml) öffnen und gegebenenfalls anmelden.
