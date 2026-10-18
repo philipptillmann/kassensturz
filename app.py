@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import csv, datetime, hashlib, io, json, os, re, sqlite3
+import csv, datetime, hashlib, io, json, os, re, sqlite3, secrets
 from contextlib import nullcontext
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -27,6 +27,8 @@ def init(db=None):
         CREATE TABLE IF NOT EXISTS transactions(id INTEGER PRIMARY KEY, date TEXT NOT NULL, merchant TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name), import_key TEXT UNIQUE);
         CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, name TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name));
         CREATE TABLE IF NOT EXISTS receipt_images(transaction_id INTEGER PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE, image BLOB NOT NULL);
+        CREATE TABLE IF NOT EXISTS csv_undo(id INTEGER PRIMARY KEY CHECK(id=1), token TEXT NOT NULL, created_at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS csv_undo_entries(transaction_id INTEGER PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE);
         CREATE TABLE IF NOT EXISTS shortcut_imports(request_id TEXT PRIMARY KEY,transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS account_settings(payment_method TEXT PRIMARY KEY REFERENCES payment_methods(name), share_bp INTEGER NOT NULL, share_income INTEGER NOT NULL, iban TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS transfer_links(outgoing_id INTEGER PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE,incoming_id INTEGER UNIQUE NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,manual INTEGER NOT NULL);
@@ -244,11 +246,32 @@ def import_csv(d, db=None):
         c.execute('BEGIN IMMEDIATE')
         plan = _csv_plan(d, c)
         new = [row['values'] for row in plan if not row['duplicate']]
-        c.executemany('INSERT INTO transactions(date,merchant,amount,category,import_key,payment_method,counterparty_iban) VALUES (?,?,?,?,?,?,?)', new)
+        if new:
+            c.execute('DELETE FROM csv_undo_entries')
+            c.execute('INSERT OR REPLACE INTO csv_undo VALUES (1,?,?)', (secrets.token_hex(24), datetime.datetime.now(datetime.timezone.utc).isoformat()))
+            for values in new:
+                cursor = c.execute('INSERT INTO transactions(date,merchant,amount,category,import_key,payment_method,counterparty_iban) VALUES (?,?,?,?,?,?,?)', values)
+                c.execute('INSERT INTO csv_undo_entries VALUES (?)', (cursor.lastrowid,))
     result = {'added': len(new), 'skipped': len(plan)-len(new)}
     excluded = csv_excluded(d)
     if excluded: result['excluded'] = excluded
     return result
+
+def last_csv_import(db=None):
+    with connect(db) as c:
+        row = c.execute('SELECT token,created_at,(SELECT count(*) FROM csv_undo_entries) AS count FROM csv_undo WHERE id=1').fetchone()
+        return dict(row) if row else {'token': None, 'count': 0, 'created_at': None}
+
+def revert_csv_import(token, db=None):
+    with connect(db) as c:
+        c.execute('BEGIN IMMEDIATE')
+        row = c.execute('SELECT token FROM csv_undo WHERE id=1').fetchone()
+        if not isinstance(token, str) or not row or not secrets.compare_digest(row['token'], token):
+            raise ValueError('CSV-Import hat sich geändert oder wurde bereits rückgängig gemacht. Bitte erneut prüfen.')
+        count = c.execute('DELETE FROM transactions WHERE id IN (SELECT transaction_id FROM csv_undo_entries)').rowcount
+        c.execute('DELETE FROM csv_undo_entries')
+        c.execute('DELETE FROM csv_undo')
+    return {'removed': count}
 
 def rename_category(old, new, db=None):
     if not isinstance(old, str) or not isinstance(new, str) or not new.strip() or len(new.strip()) > 60:

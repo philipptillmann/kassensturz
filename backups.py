@@ -228,6 +228,8 @@ def restore(stream, db):
             con.execute('ATTACH DATABASE ? AS restored', (str(stage),))
             with con:
                 con.execute('BEGIN IMMEDIATE')
+                con.execute('DELETE FROM csv_undo_entries')
+                con.execute('DELETE FROM csv_undo')
                 for table in TABLES:
                     con.execute('DELETE FROM main.' + table)
                 for table in reversed(TABLES):

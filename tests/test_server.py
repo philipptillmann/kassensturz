@@ -154,6 +154,18 @@ class ServerTests(unittest.TestCase):
         self.login(restarted)
         self.assertEqual(restarted.get('/api/data').json['transactions'][0]['amount'], 450)
 
+    def test_csv_undo_api_is_dataset_scoped_and_consumed_once(self):
+        csrf=self.login()
+        data={'text':'Date;Name;Amount\n2026-10-01;Synthetic cafe;-5,00\n','date_column':'Date','merchant_column':'Name','amount_column':'Amount'}
+        self.assertEqual(self.post('/api/import',data,csrf).status_code,200)
+        batch=self.post('/api/import-undo-preview',{},csrf).json
+        self.assertEqual(batch['count'],1)
+        self.assertEqual(self.post('/api/import-undo',{'token':batch['token']},'wrong').status_code,403)
+        self.assertEqual(self.post('/api/import-undo?dataset=demo',{'token':batch['token']},csrf).status_code,400)
+        self.assertEqual(self.post('/api/import-undo',{'token':batch['token']},csrf).json,{'removed':1})
+        self.assertEqual(self.post('/api/import-undo',{'token':batch['token']},csrf).status_code,400)
+        self.assertEqual(self.client.get('/api/data').json['transactions'],[])
+
     def test_bad_json_and_oversized_upload(self):
         csrf = self.login()
         self.assertEqual(self.post('/api/transaction', [], csrf).status_code, 400)

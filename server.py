@@ -442,6 +442,10 @@ def create_app(password=None, public_url=None):
         elif action == 'import-preview':
             columns, rows = ledger.read_csv(data['text'])
             result = {'headers': columns, 'rows': rows[:3], 'count': len(rows), 'provider': 'trade-republic' if ledger.trade_republic(columns) else None}
+        elif action == 'import-undo-preview':
+            result = ledger.last_csv_import(db=g.dataset_paths[g.dataset])
+        elif action == 'import-undo':
+            result = ledger.revert_csv_import(data.get('token'), db=g.dataset_paths[g.dataset])
         elif action == 'import-check':
             result = ledger.preview_import(data, db=g.dataset_paths[g.dataset])
         elif action == 'import':
