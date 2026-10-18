@@ -122,6 +122,17 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         val s=snapshot()
         TransferMatcher.automatic(s.entries,s.accounts,s.transfers,s.ignored).forEach { pair -> writableDatabase.insertOrThrow("transfers",null,values("outgoing" to pair.outgoing,"incoming" to pair.incoming)) }
     }
+    fun previewImport(entries: List<Entry>): Pair<Int,Int> {
+        val known=readableDatabase.rawQuery("SELECT import_key FROM entries WHERE import_key IS NOT NULL",null).use { c ->
+            mutableSetOf<String>().apply { while(c.moveToNext()) add(c.getString(0)) }
+        }
+        var skipped=0
+        entries.forEach { e ->
+            Ledger.validate(e)
+            if(e.importKey != null && !known.add(e.importKey)) skipped++
+        }
+        return (entries.size-skipped) to skipped
+    }
     fun importEntries(entries: List<Entry>): Pair<Int,Int> = transaction { db ->
         var imported=0; var skipped=0
         entries.forEach { e ->

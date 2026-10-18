@@ -72,7 +72,10 @@ class StoreTest {
     @Test fun testCsvDedupIsAccountScopedAndAtomic() {
         val csv=listOf(listOf("Date","Name","Amount"),listOf("2026-10-01","Shop","-5"),listOf("2026-10-01","Shop","-5"))
         val a=BankCsv.entries(csv,0,1,2,"A","Shopping",true)
+        assertEquals(2 to 0,db.previewImport(a));assertTrue(db.snapshot().entries.isEmpty())
         assertEquals(2 to 0,db.importEntries(a));assertEquals(0 to 2,db.importEntries(a))
+        assertEquals(0 to 2,db.previewImport(a))
+        assertEquals(2 to 0,db.previewImport(BankCsv.entries(csv,0,1,2,"B","Shopping",true)))
         assertEquals(2 to 0,db.importEntries(BankCsv.entries(csv,0,1,2,"B","Shopping",true)))
         try { db.importEntries(listOf(entry(),entry().copy(category="Missing")));fail("Invalid batch must fail") } catch (_: IllegalArgumentException) { }
         assertEquals(4,db.snapshot().entries.size)

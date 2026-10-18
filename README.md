@@ -140,10 +140,10 @@ This process does not use an Actions job or automatically mark tests as passed.
 
 ## Shared release version
 
-The current Docker/server and Android release name is **0.3.1**. Both branches
+The current Docker/server and Android release name is **0.4.0**. Both branches
 carry the same root `VERSION` file. Android Gradle reads it for `versionName`;
 the installed app displays its package version. `versionCode` is Android's
-internal upgrade counter and remains separate. The 0.3.1 source uses versionCode 5. Its APK build is pending explicit cost
+internal upgrade counter and remains separate. The 0.4.0 source uses versionCode 6. Its APK build is pending explicit cost
 approval; the previously published APK remains 0.1.0.
 
 ### 0.1.1 — reimbursement entry on mobile keyboards
@@ -179,3 +179,14 @@ including native Safari rendering, so they cannot stretch the editor sideways.
 The native Android date field already uses the dialog width; it is now explicitly
 single-line with date input. Dates, stored records and backups are unchanged.
 The APK build and physical-device acceptance remain pending.
+
+
+### CSV duplicate preview (0.4.0)
+
+Before committing a CSV import, the app reports new and already imported entries
+for the selected account and dataset. Cancelling changes nothing; saving rechecks
+against the latest data. Identical genuine purchases within one statement keep
+their occurrence counts. Other accounts remain independent. Matching uses the
+existing date/description/amount/account import identity, not fuzzy guesses:
+changed bank descriptions or overlapping partial exports without stable bank IDs
+can remain ambiguous. Manually entered lookalikes are not automatically removed.

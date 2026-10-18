@@ -396,8 +396,10 @@ class MainActivity : Activity() {
             dialog("Spalten zuordnen",mapping,"Vorschau") {
                 val entries=BankCsv.entries(rows,date.selectedItemPosition,merchant.selectedItemPosition,amount.selectedItemPosition,account.text.toString(),cat.selectedItem.toString(),signs.isChecked,iban.selectedItemPosition-1,income.isChecked)
                 require(entries.isNotEmpty()) { "Keine Buchungen mit Betrag gefunden." }
-                confirm("${entries.size} Buchungen importieren?",entries.take(8).joinToString("\n") { "${it.date} · ${it.merchant} · ${money(it.amount)}" }+"\n\nBereits importierte Buchungen werden übersprungen. Gutschriften können anschließend einzeln als Einnahme oder Erstattung bearbeitet werden.") {
-                    work({val counts=store.importEntries(entries);counts to store.snapshot()}) { (counts,snapshot)->data=snapshot;screen();toast("${counts.first} importiert, ${counts.second} bereits vorhanden.") }
+                work({store.previewImport(entries)}) { counts ->
+                    confirm("${counts.first} neue Buchungen importieren?", "${counts.second} bereits vorhandene werden übersprungen.\n\n"+entries.take(8).joinToString("\n") { "${it.date} · ${it.merchant} · ${money(it.amount)}" }+"\n\nDie Prüfung wird beim Speichern wiederholt. Gutschriften können anschließend als Einnahme oder Erstattung bearbeitet werden.") {
+                        work({val actual=store.importEntries(entries);actual to store.snapshot()}) { (actual,snapshot)->data=snapshot;screen();toast("${actual.first} importiert, ${actual.second} bereits vorhanden.") }
+                    }
                 }
             }
         }
