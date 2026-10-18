@@ -18,6 +18,14 @@ These are standing user requirements for future work.
 - Repository/documentation-only restructuring keeps the existing release version
   and Android versionCode; it does not publish a new app-code release.
 
+## Request tracking
+
+- Create a GitHub issue summarizing each new development request before implementation.
+- Link the implementing commits and release version, record checks/limitations,
+  and close the request issue when the source work is delivered.
+- Keep Android physical-device testing issues separate and open for the user to
+  complete manually; closing an implementation issue does not certify testing.
+
 ## Cost approval and testing
 
 - Obtain explicit user approval before starting any action that could incur

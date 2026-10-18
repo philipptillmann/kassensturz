@@ -55,6 +55,9 @@ tbody tr:last-child td{border-bottom:0}
 .tablewrap{overflow:auto}
 .cardhead input{max-width:290px;width:100%;font-size:14px}
 input,select{border:1px solid #cfd7cc;background:var(--paper);border-radius:8px;padding:10px 12px;color:var(--ink);min-width:0;min-height:44px}
+/* Native Safari date controls must fit their grid cell, including padding. */
+input[type="date"],input[type="month"]{-webkit-appearance:none;appearance:none;display:block;box-sizing:border-box;max-width:100%;min-width:0}
+input::-webkit-date-and-time-value{min-width:0;text-align:left}
 .empty{text-align:center;padding:32px 12px;color:var(--muted)}
 .empty p{font-size:14px}
 .empty h3{color:var(--ink)}
@@ -68,8 +71,9 @@ form label{display:flex;flex-direction:column;gap:7px;color:var(--muted);font-si
 hr{border:0;border-top:1px solid var(--line);margin:24px 0}
 dialog{border:1px solid var(--line);border-radius:16px;width:720px;max-width:94vw;max-height:92dvh;padding:28px;color:var(--ink);box-shadow:0 24px 80px #13291f26}
 dialog::backdrop{background:#172a2466}
-.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:24px 0 8px}
-.formgrid input,.formgrid select{width:100%}
+.formgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:24px 0 8px}
+.formgrid>label{min-width:0}
+.formgrid input,.formgrid select{width:100%;max-width:100%}
 .close{border:0;font-size:25px;padding:0 10px;background:transparent}
 .receiptbox{background:var(--canvas);border:1px solid var(--line);border-radius:8px;padding:16px;margin:22px 0;display:flex;gap:15px;align-items:center}
 .receiptbox span{font-size:12px;color:var(--muted)}

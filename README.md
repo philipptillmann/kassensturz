@@ -391,7 +391,7 @@ bis der Benutzer es nach dem Test manuell abschließt.
 
 ### Gemeinsame Versionsnummer
 
-Aktueller gemeinsamer Versionsname: **0.3.0**. Die Datei `VERSION` im Repository-
+Aktueller gemeinsamer Versionsname: **0.3.1**. Die Datei `VERSION` im Repository-
 Stamm ist die Quelle für Docker/Server und Android und wird auf beiden Branches
 gleich gehalten. Das Docker-Image enthält diese Datei; die Web-App zeigt die
 Version unter Einstellungen an. Android verwendet sie als `versionName`. Der
@@ -449,3 +449,12 @@ Exporter checks now live in `tests/test_android_export.py` and are included in
 the existing server unittest discovery. The export tool itself needs no server
 Python dependencies. As usual, request approval before potentially metered tests
 or workflows; the repository move does not authorize running them.
+
+
+### Datumsfeld auf mobilen Geräten (0.3.1)
+
+Datums- und Monatsfelder bleiben innerhalb ihrer verfügbaren Formularbreite,
+auch bei der nativen Darstellung in Safari. Formularspalten und Beschriftungen
+können schrumpfen, sodass das Datumsfeld den Buchungseditor nicht seitlich
+verbreitert. Der native Android-Editor verwendet ein einzeiliges Datumsfeld in
+Dialogbreite. Gespeicherte Daten und das Datumsformat bleiben unverändert.
