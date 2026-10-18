@@ -58,6 +58,41 @@ object BankCsv {
             } catch(e: IllegalArgumentException) { throw IllegalArgumentException("Zeile ${index+2}: ${e.message}") }
         }
     }
+    private val volksbankHeader=listOf("Bezeichnung Auftragskonto","IBAN Auftragskonto","BIC Auftragskonto","Bankname Auftragskonto","Buchungstag","Valutadatum","Name Zahlungsbeteiligter","IBAN Zahlungsbeteiligter","BIC (SWIFT-Code) Zahlungsbeteiligter","Buchungstext","Verwendungszweck","Betrag","Waehrung","Saldo nach Buchung","Bemerkung","Gekennzeichneter Umsatz","Glaeubiger ID","Mandatsreferenz")
+    fun isVolksbank(rows:List<List<String>>) = rows.firstOrNull()==volksbankHeader
+    private fun iban(value:String)=value.replace(Regex("\\s+"),"").uppercase(java.util.Locale.ROOT)
+    fun volksbankAccounts(rows:List<List<String>>):List<String> {
+        require(isVolksbank(rows) && rows.drop(1).all { it.size==volksbankHeader.size }) { "Volksbank: Unerwartete Spaltenanzahl." }
+        return rows.drop(1).map { iban(it[1]) }.distinct().sorted().also { accounts -> require(accounts.isNotEmpty() && accounts.all { it.isNotEmpty() && it.length<=34 }) { "Volksbank: IBAN Auftragskonto fehlt oder ist zu lang." } }
+    }
+    fun volksbank(rows:List<List<String>>,account:String,category:String,sourceAccount:String=""):ProviderImport {
+        require(account.isNotBlank()) { "Für Volksbank bitte ein Zahlungsmittel auswählen." }
+        val accounts=volksbankAccounts(rows)
+        val source=iban(sourceAccount).ifEmpty { if(accounts.size==1) accounts.single() else "" }
+        require(source in accounts) { "Volksbank: Genau ein Quellkonto aus der CSV auswählen." }
+        val entries=mutableListOf<Entry>();val excluded=mutableListOf<String>();val occurrences=mutableMapOf<String,Int>()
+        rows.drop(1).forEachIndexed { index,row ->
+            val r=volksbankHeader.zip(row).toMap()
+            fun cell(name:String)=r.getValue(name).trim()
+            val own=iban(cell("IBAN Auftragskonto"))
+            if(own!=source) excluded.add("Zeile ${index+2}: Anderes Quellkonto (nicht ausgewählt)")
+            else try {
+                require(cell("Waehrung")=="EUR") { "Nur EUR wird unterstützt." }
+                val day=date(cell("Buchungstag"));val valueDay=date(cell("Valutadatum"));val value= -amount(cell("Betrag"))
+                if(value==0L) excluded.add("Zeile ${index+2}: Nullbetrag")
+                else {
+                    val merchant=cell("Name Zahlungsbeteiligter").ifEmpty { cell("Verwendungszweck") }.ifEmpty { cell("Buchungstext") }
+                    val counterparty=iban(cell("IBAN Zahlungsbeteiligter"));require(counterparty.length<=34) { "Gegenkonto zu lang." }
+                    val notes=listOf("Buchungstext","Verwendungszweck","Bemerkung","Glaeubiger ID","Mandatsreferenz").map { cell(it) }.filter { it.isNotEmpty() }.joinToString("\n")
+                    val base=listOf("volksbank",account.trim(),own,day,valueDay,merchant,counterparty,cell("Buchungstext"),cell("Verwendungszweck"),cell("Glaeubiger ID"),cell("Mandatsreferenz"),value.toString(),"EUR").joinToString("\u0000")
+                    val nth=occurrences.getOrDefault(base,0)+1;occurrences[base]=nth
+                    val key=MessageDigest.getInstance("SHA-256").digest((base+"\u0000"+nth).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+                    entries.add(Entry(date=day,merchant=merchant,amount=value,category=category,payment=account.trim(),kind="expense",notes=notes,counterparty=counterparty,importKey="vb:$key").also { Ledger.validate(it) })
+                }
+            } catch(e:IllegalArgumentException) { throw IllegalArgumentException("Volksbank-Zeile ${index+2}: ${e.message}") }
+        }
+        return ProviderImport(entries,excluded)
+    }
     private val ingHeader=listOf("Buchung","Wertstellungsdatum","Auftraggeber/Empfänger","Buchungstext","Verwendungszweck","Referenz","Saldo","Währung","Betrag","Währung")
     private val ingColumns=ingHeader.dropLast(1)+"Betragswährung"
     fun isIng(rows: List<List<String>>) = rows.firstOrNull()==ingColumns

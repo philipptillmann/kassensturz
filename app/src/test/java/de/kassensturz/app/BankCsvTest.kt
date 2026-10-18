@@ -4,6 +4,31 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class BankCsvTest {
+    private val vbHeader="Bezeichnung Auftragskonto;IBAN Auftragskonto;BIC Auftragskonto;Bankname Auftragskonto;Buchungstag;Valutadatum;Name Zahlungsbeteiligter;IBAN Zahlungsbeteiligter;BIC (SWIFT-Code) Zahlungsbeteiligter;Buchungstext;Verwendungszweck;Betrag;Waehrung;Saldo nach Buchung;Bemerkung;Gekennzeichneter Umsatz;Glaeubiger ID;Mandatsreferenz"
+    private val vbRow="Demo account;DE00000000000000000000;DEMO;Example bank;03.10.2026;02.10.2026;Fictional shop;de 2222;DEMO;Lastschrift;Fictional purpose;-23,45;EUR;1.234,56;Fixture note;;Demo creditor;Demo mandate"
+    @Test fun volksbankMappingIdentityNotesAndDuplicates() {
+        val rows=BankCsv.parse("\uFEFF$vbHeader\r\n$vbRow\r\n$vbRow",';')
+        assertTrue(BankCsv.isVolksbank(rows))
+        val result=BankCsv.volksbank(rows,"Bar","Unkategorisiert")
+        val entry=result.entries.first()
+        assertEquals("2026-10-03",entry.date);assertEquals(2345L,entry.amount);assertEquals("DE2222",entry.counterparty)
+        assertEquals("Lastschrift\nFictional purpose\nFixture note\nDemo creditor\nDemo mandate",entry.notes)
+        assertEquals("vb:8a2526a0e07d0150840e1b9e960654dce9c4a475a5a418e8e15c8d71c18b7a62",entry.importKey);assertNotEquals(entry.importKey,result.entries[1].importKey)
+        val changed=vbRow.replace("1.234,56","0").replace("Fixture note","Changed");assertEquals(entry.importKey,BankCsv.volksbank(BankCsv.parse("$vbHeader\n$changed",';'),"Bar","Unkategorisiert").entries.single().importKey)
+    }
+    @Test fun volksbankMultiAccountSelectionAndValidation() {
+        val other=vbRow.replace("DE00000000000000000000","DE11111111111111111111")
+        val rows=BankCsv.parse("$vbHeader\n$vbRow\n$other",';')
+        assertEquals(2,BankCsv.volksbankAccounts(rows).size)
+        assertThrows(IllegalArgumentException::class.java) { BankCsv.volksbank(rows,"Bar","Unkategorisiert") }
+        val result=BankCsv.volksbank(rows,"Bar","Unkategorisiert","DE00000000000000000000")
+        assertEquals(1,result.entries.size);assertEquals(1,result.excluded.size)
+        assertNotEquals(result.entries.single().importKey,BankCsv.volksbank(rows,"Bar","Unkategorisiert","DE11111111111111111111").entries.single().importKey)
+        for(invalid in listOf(vbRow.replace("EUR","USD"),vbRow.replace("03.10.2026","31.02.2026"),vbRow.replace("-23,45","1,234"),vbRow.substringBeforeLast(';'))) {
+            assertThrows(IllegalArgumentException::class.java) { BankCsv.volksbank(BankCsv.parse("$vbHeader\n$invalid",';'),"Bar","Unkategorisiert") }
+        }
+        assertEquals(1,BankCsv.volksbank(BankCsv.parse("$vbHeader\n"+vbRow.replace("-23,45","0"),';'),"Bar","Unkategorisiert").excluded.size)
+    }
     private fun ingFixture(vararg lines:String) = "\uFEFFUmsatzanzeige;Synthetic fixture only;;;;;;;;\r\nIBAN;DE00000000000000000000;;;;;;;;\r\n;;;;;;;;;\r\nBuchung;Wertstellungsdatum;Auftraggeber/Empfänger;Buchungstext;Verwendungszweck;Referenz;Saldo;Währung;Betrag;Währung\r\n"+lines.joinToString("\r\n")
     @Test fun ingPreambleCurrenciesNotesAndSharedIdentity() {
         val row="30.09.2026;29.09.2026;Example shop;Lastschrift;Example purpose;;9.876,54;EUR;-10,50;EUR"

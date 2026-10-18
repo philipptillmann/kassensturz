@@ -398,8 +398,10 @@ class MainActivity : Activity() {
         dialog("Bank-CSV",f,"Spalten zuordnen") {
             val rows=BankCsv.parse(text,when(delimiter.selectedItemPosition){1->',';2->'\t';else->';'})
             require(rows.size>1) { "Keine CSV-Daten gefunden." };require(account.text.isNotBlank()) { "Konto fehlt." }
-            val tr=BankCsv.isTradeRepublic(rows);val ing=BankCsv.isIng(rows)
-            val mapping=form();if(ing) label(mapping,"ING erkannt. Spalten und EUR-Vorzeichen automatisch; Verwendungszweck/Referenz als Notizen. Gehalt/Rente als Einnahme. Andere Gutschriften anschließend prüfen. Keine eindeutige ID: Teilimporte identischer Buchungen manuell prüfen.",14f,color=muted)
+            val tr=BankCsv.isTradeRepublic(rows);val ing=BankCsv.isIng(rows);val vb=BankCsv.isVolksbank(rows)
+            val mapping=form();val source=if(vb) select(mapping,"Quellkonto in der CSV",listOf("Bitte auswählen")+BankCsv.volksbankAccounts(rows)) else null
+            if(vb) label(mapping,"Volksbank erkannt: Quellkonto und passendes Zahlungsmittel wählen. Gutschriften anschließend als Einnahme oder Erstattung prüfen. Keine eindeutige ID: Teilimporte identischer Buchungen manuell prüfen.",14f,color=muted)
+            if(ing) label(mapping,"ING erkannt. Spalten und EUR-Vorzeichen automatisch; Verwendungszweck/Referenz als Notizen. Gehalt/Rente als Einnahme. Andere Gutschriften anschließend prüfen. Keine eindeutige ID: Teilimporte identischer Buchungen manuell prüfen.",14f,color=muted)
             if(tr) label(mapping,"Trade Republic erkannt. Spalten und Vorzeichen werden automatisch zugeordnet. Nur Karten und Überweisungen; weitere Arten werden ausdrücklich ausgeschlossen.",14f,color=muted)
             val headers=rows.first().mapIndexed { i,h->"${i+1}: $h" }
             fun guess(vararg words:String)=headers.firstOrNull { h->words.any { h.contains(it,true) } }
@@ -407,15 +409,16 @@ class MainActivity : Activity() {
             val merchant=select(mapping,"Bezeichnung / Verwendungszweck",headers,guess("Verwendungszweck","Buchungstext","Beschreibung","Merchant"))
             val amount=select(mapping,"Betrag",headers,guess("Betrag","Amount"))
             val iban=select(mapping,"Gegenkonto-IBAN (optional)",listOf("Keine")+headers)
-            if(tr || ing) {
-                date.setSelection(rows.first().indexOf(if(ing) "Buchung" else "date"))
-                merchant.setSelection(rows.first().indexOf(if(ing) "Auftraggeber/Empfänger" else "name"))
-                amount.setSelection(rows.first().indexOf(if(ing) "Betrag" else "amount"))
-                iban.setSelection(if(ing) 0 else rows.first().indexOf("counterparty_iban")+1)
+            if(tr || ing || vb) {
+                date.setSelection(rows.first().indexOf(if(vb) "Buchungstag" else if(ing) "Buchung" else "date"))
+                merchant.setSelection(rows.first().indexOf(if(vb) "Name Zahlungsbeteiligter" else if(ing) "Auftraggeber/Empfänger" else "name"))
+                amount.setSelection(rows.first().indexOf(if(ing || vb) "Betrag" else "amount"))
+                iban.setSelection(if(vb) rows.first().indexOf("IBAN Zahlungsbeteiligter")+1 else if(ing) 0 else rows.first().indexOf("counterparty_iban")+1)
                 listOf(date,merchant,amount,iban).forEach { it.isEnabled=false }
             }
             dialog("Spalten zuordnen",mapping,"Vorschau") {
-                val provider=if(ing) BankCsv.ing(rows,account.text.toString(),cat.selectedItem.toString()) else if(tr) BankCsv.tradeRepublic(rows,account.text.toString(),cat.selectedItem.toString()) else null
+                if(vb) require(source!!.selectedItemPosition>0) { "Bitte Quellkonto auswählen." }
+                val provider=if(vb) BankCsv.volksbank(rows,account.text.toString(),cat.selectedItem.toString(),source!!.selectedItem.toString()) else if(ing) BankCsv.ing(rows,account.text.toString(),cat.selectedItem.toString()) else if(tr) BankCsv.tradeRepublic(rows,account.text.toString(),cat.selectedItem.toString()) else null
                 val entries=provider?.entries ?: BankCsv.entries(rows,date.selectedItemPosition,merchant.selectedItemPosition,amount.selectedItemPosition,account.text.toString(),cat.selectedItem.toString(),signs.isChecked,iban.selectedItemPosition-1,income.isChecked)
                 require(entries.isNotEmpty()) { "Keine unterstützten Buchungen mit Betrag gefunden.\n"+provider?.excluded.orEmpty().joinToString("\n") }
                 work({store.previewImport(entries)}) { counts ->
