@@ -6,10 +6,10 @@ $('dataset').value=dataset;
 let state={transactions:[],categories:[]}, editing=null, csvText='', currentView='overview';
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 $('month').value=today().slice(0,7);
-async function api(path,data){
+async function api(path,data,extraHeaders={}){
   pending++;$('dataset').disabled=true;
   try {
-    const r=await fetch('/api/'+path+'?dataset='+encodeURIComponent(dataset),data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(data)});
+    const r=await fetch('/api/'+path+'?dataset='+encodeURIComponent(dataset),data===undefined?{}:{method:'POST',headers:{'Content-Type':data instanceof Blob?'application/zip':'application/json','X-CSRF-Token':csrf,...extraHeaders},body:data instanceof Blob?data:JSON.stringify(data)});
     if(r.status===401){window.location.replace('/login');throw Error('Bitte anmelden.')}
     if(!r.ok){let msg='Anfrage fehlgeschlagen.';try{msg=(await r.json()).error}catch{}throw Error(msg)}
     return await r.json();
@@ -25,7 +25,7 @@ function notice(s){$('notice').textContent=s}
 async function refresh(){state=await api('data');render()}
 function options(selected){selected=selected||state.default_category||'Unkategorisiert';return state.categories.map(c=>`<option ${c===selected?'selected':''}>${esc(c)}</option>`).join('')}
 function monthTransactions(){return KassensturzReports.monthView(state.transactions,$('month').value,$('costMode').value==='effective',state.accounts||[])}
-function render(){$('export').href='/api/export?dataset='+encodeURIComponent(dataset);$('export').download='kassensturz-'+dataset+'.csv';const query=$('search').value.toLocaleLowerCase();const all=monthTransactions();const filtered=all.filter(t=>JSON.stringify([t.merchant,t.category,t.items,t.group_name,t.payment_method,t.notes,t.members]).toLocaleLowerCase().includes(query));
+function render(){$('backupExport').href='/api/backup?dataset='+encodeURIComponent(dataset);$('export').href='/api/export?dataset='+encodeURIComponent(dataset);$('export').download='kassensturz-'+dataset+'.csv';const query=$('search').value.toLocaleLowerCase();const all=monthTransactions();const filtered=all.filter(t=>JSON.stringify([t.merchant,t.category,t.items,t.group_name,t.payment_method,t.notes,t.members]).toLocaleLowerCase().includes(query));
 $('effectiveHint').hidden=$('costMode').value!=='effective'||!['overview','transactions'].includes(currentView);
 $('totalLabel').textContent=$('costMode').value==='effective'?'Effektive Ausgaben im Monat':'Ausgaben im Monat';$('totalHint').textContent=$('costMode').value==='effective'?'Gruppen nach Abzug ihrer Beiträge':'Positive Ausgaben vor Gutschriften';
 $('total').textContent=euro(all.reduce((n,t)=>n+Math.max(t.amount,0),0));$('credits').textContent=euro(all.reduce((n,t)=>n+(t.kind==='income'?0:Math.max(-t.amount,0)),0));$('incomeTotal').textContent=euro(all.reduce((n,t)=>n+(t.kind==='income'?Math.max(-t.amount,0):0),0));$('uncat').textContent=all.filter(t=>t.items.length?t.items.some(i=>i.category===(state.default_category||'Unkategorisiert')):t.category===(state.default_category||'Unkategorisiert')).length;
@@ -160,3 +160,17 @@ function renderAccounts(){
   $('transferList').querySelectorAll('[data-action]').forEach(button=>button.onclick=async()=>{button.disabled=true;try{await api(button.dataset.action,{outgoing_id:Number(button.dataset.out),incoming_id:Number(button.dataset.in)});await refresh()}catch(e){notice(e.message);button.disabled=false}});
 }
 $('accountForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await api('account',{name:$('accountName').value,iban:$('accountIban').value,share_percent:$('accountShare').value,share_income:$('accountIncome').checked});await refresh();notice('Kontoeinstellungen gespeichert.')}catch(e){notice(e.message)}finally{button.disabled=false}};
+
+
+$('backupFile').onchange=async()=>{
+  const file=$('backupFile').files[0],targetDataset=dataset;if(!file)return;
+  try{
+    if(file.size>544000000)throw Error('Sicherung zu groß (maximal 544 MB).');
+    const summary=await api('backup-preview',file);
+    if(dataset!==targetDataset)throw Error('Datensatz wurde gewechselt. Bitte erneut auswählen.');
+    const source=summary.dataset==='demo'?'Demo':summary.dataset==='private'?'Privat':'nicht angegeben';
+    if(!confirm(`Sicherung: ${summary.entries} Buchungen, ${summary.receipts} Belege.\nQuelle: ${source}${summary.created_at?' · '+summary.created_at:''}\n\nAlle Buchungen, Einstellungen und Belege in ${targetDataset==='demo'?'Demo':'Privat'} ersetzen? Vorher eine eigene ZIP-Sicherung herunterladen. Anmeldung und andere Benutzer bleiben erhalten.`))return;
+    await api('backup-restore',file,{'X-Backup-Confirm':targetDataset});
+    await refresh();notice('Sicherung wiederhergestellt.');
+  }catch(error){notice(error.message)}finally{$('backupFile').value=''}
+};

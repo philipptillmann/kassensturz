@@ -7,16 +7,19 @@ import secrets
 import sqlite3
 import threading
 import time
+import tempfile
+import datetime
 from collections import deque
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from flask import Flask, g, jsonify, make_response, request, send_from_directory
+from flask import Flask, g, jsonify, make_response, request, send_from_directory, send_file
 from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import app as ledger
 import accounts
+import backups
 import users
 from datasets import prepare_demo
 from receipts import OCRBusy
@@ -73,12 +76,15 @@ def create_app(password=None, public_url=None):
 
     @web.before_request
     def access_control():
+        backup_upload = request.path in ('/api/backup-preview', '/api/backup-restore')
+        if backup_upload:
+            request.max_content_length = backups.MAX_ARCHIVE_BYTES
         if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
             expected_origin = public_url or request.host_url.rstrip('/')
             if request.headers.get('Origin') != expected_origin:
                 return failure('Ungültiger Ursprung. Bitte die konfigurierte Serveradresse verwenden.', 403)
-            if not request.is_json:
-                return failure('JSON erwartet.', 415)
+            if not request.is_json and not (backup_upload and request.mimetype in ('application/zip', 'application/octet-stream')):
+                return failure('JSON oder eine ZIP-Sicherung erwartet.' if backup_upload else 'JSON erwartet.', 415)
         public_paths = {'/login', '/login.js', '/style.css', '/api/login', '/api/auth-status', '/healthz', '/manifest.webmanifest',
                         '/icons/icon.svg', '/icons/icon-180.png', '/icons/icon-192.png', '/icons/icon-512.png'}
         if request.path in public_paths:
@@ -127,7 +133,7 @@ def create_app(password=None, public_url=None):
     @web.errorhandler(HTTPException)
     def http_error(error):
         if error.code == 413:
-            return failure('Datei zu groß (maximal 12 MB für Rechnungsbilder).', 413)
+            return failure('Sicherung zu groß (maximal 544 MB).' if request.path.startswith('/api/backup') else 'Datei zu groß (maximal 12 MB für Rechnungsbilder).', 413)
         return failure(error.description, error.code)
 
     @web.errorhandler(ValueError)
@@ -303,6 +309,46 @@ def create_app(password=None, public_url=None):
         response.headers['Content-Disposition'] = f'inline; filename=kassensturz-beleg-{transaction_id}.jpg'
         return response
 
+    @web.get('/api/backup')
+    def download_backup():
+        output = tempfile.SpooledTemporaryFile(max_size=1_000_000, dir=g.dataset_paths[g.dataset].parent)
+        try:
+            backups.write_archive(g.dataset_paths[g.dataset], output, dataset=g.dataset)
+            size = output.tell()
+            output.seek(0)
+            response = send_file(output, mimetype='application/zip', as_attachment=True,
+                                 download_name=f'kassensturz-{g.dataset}-{datetime.date.today()}.zip')
+            response.content_length = size
+            response.call_on_close(output.close)
+            return response
+        except BaseException:
+            output.close()
+            raise
+
+    @web.post('/api/backup-preview')
+    @web.post('/api/backup-restore')
+    def upload_backup():
+        restoring = request.path.endswith('backup-restore')
+        if restoring and request.headers.get('X-Backup-Confirm') != g.dataset:
+            return failure('Wiederherstellen des ausgewählten Datensatzes bitte bestätigen.')
+        with tempfile.SpooledTemporaryFile(max_size=1_000_000, dir=g.dataset_paths[g.dataset].parent) as upload:
+            size = 0
+            while True:
+                chunk = request.stream.read(65536)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > backups.MAX_ARCHIVE_BYTES:
+                    return failure('Sicherung zu groß (maximal 544 MB).', 413)
+                upload.write(chunk)
+            upload.seek(0)
+            if restoring:
+                result = backups.restore(upload, g.dataset_paths[g.dataset])
+            else:
+                result = backups.preview(upload, temp_dir=g.dataset_paths[g.dataset].parent)
+            result['target_dataset'] = g.dataset
+            return jsonify(result)
+
     @web.get('/api/export')
     def export():
         out = io.StringIO()
@@ -388,5 +434,5 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', '8080'))
     print(f'Kassensturz listening on port {port}', flush=True)
     serve(application, host='0.0.0.0', port=port, threads=8,
-          max_request_body_size=MAX_BODY, channel_timeout=120,
+          max_request_body_size=backups.MAX_ARCHIVE_BYTES, channel_timeout=120,
           clear_untrusted_proxy_headers=True, expose_tracebacks=False)

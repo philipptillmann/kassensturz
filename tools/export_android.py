@@ -5,6 +5,8 @@ Run as the server operator against a local data directory or a complete backup.
 Only Python's standard library is required. Source databases are read-only.
 """
 import argparse
+from contextlib import closing
+import datetime
 import json
 import os
 from pathlib import Path
@@ -44,42 +46,54 @@ def source_database(root, username=None, legacy=False, dataset='private'):
     return folder / ('expenses.sqlite3' if dataset == 'private' else 'demo.sqlite3')
 
 
+def write_archive(source, output, dataset=None):
+    """Write a consistent, credential-free portable ZIP to an open binary stream."""
+    with closing(connect(source)) as con, con:
+        con.execute('BEGIN')  # One consistent snapshot, including WAL and receipt blobs.
+        for table, limit in [('transactions',50000),('categories',2000),('payment_methods',2000)]:
+            if con.execute('SELECT count(*) FROM ' + table).fetchone()[0] > limit:
+                raise ValueError('Dataset exceeds the Android backup limits.')
+        categories = [r[0] for r in con.execute('SELECT name FROM categories ORDER BY name')]
+        payments = [r[0] for r in con.execute('SELECT name FROM payment_methods ORDER BY name')]
+        parts = {}
+        for row in con.execute('SELECT * FROM items ORDER BY id'):
+            parts.setdefault(row['transaction_id'], []).append(dict(id=row['id'], name=row['name'], amount=row['amount'], category=row['category'], group=row['group_name']))
+        receipt_ids = {r[0] for r in con.execute('SELECT transaction_id FROM receipt_images')}
+        receipt_size = con.execute('SELECT COALESCE(SUM(length(image)),0),COALESCE(MAX(length(image)),0) FROM receipt_images').fetchone()
+        if receipt_size[0] > 512_000_000 or receipt_size[1] > 4_000_000:
+            raise ValueError('Receipt images exceed the Android backup limits.')
+        entries = []
+        for row in con.execute('SELECT * FROM transactions ORDER BY date DESC,id DESC'):
+            entries.append(dict(id=row['id'], date=row['date'], merchant=row['merchant'], amount=row['amount'], category=row['category'], payment=row['payment_method'], kind=row['kind'], notes=row['notes'], group=row['group_name'], parts=parts.get(row['id'], []), receipt=row['id'] in receipt_ids, counterparty=row['counterparty_iban'], import_key=row['import_key']))
+        accounts = [dict(name=r['payment_method'], share=r['share_bp'], share_income=bool(r['share_income']), iban=r['iban']) for r in con.execute('SELECT * FROM account_settings')]
+        def pairs(table):
+            return [dict(outgoing=r['outgoing_id'], incoming=r['incoming_id'], **({'manual': r['manual']} if table == 'transfer_links' else {})) for r in con.execute('SELECT * FROM ' + table)]
+        meta = dict(format='kassensturz-android', version=1, categories=categories, payments=payments, entries=entries, accounts=accounts, transfers=pairs('transfer_links'), ignored=pairs('transfer_ignored'))
+        # A renamed server default is still represented by its category alias.
+        if con.execute("SELECT 1 FROM category_aliases WHERE alias='Ausgehen'").fetchone():
+            meta['category_defaults_version'] = 1
+        meta['server_aliases'] = dict(con.execute('SELECT alias,name FROM category_aliases'))
+        meta['created_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        if dataset is not None:
+            meta['dataset'] = dataset
+        encoded = json.dumps(meta, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+        if len(encoded) > 16_000_000 or len(entries) > 50000 or len(categories) > 2000 or len(payments) > 2000:
+            raise ValueError('Dataset exceeds the Android backup limits.')
+        with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr('data.json', encoded)
+            for row in con.execute('SELECT transaction_id,image FROM receipt_images ORDER BY transaction_id'):
+                archive.writestr(f"receipts/{row['transaction_id']}.jpg", row['image'])
+        return len(entries), len(receipt_ids)
+
+
 def export(source, output):
     output = Path(output)
     created = False
     try:
-        with connect(source) as con:
-            con.execute('BEGIN')  # One consistent snapshot, including WAL and receipt blobs.
-            categories = [r[0] for r in con.execute('SELECT name FROM categories ORDER BY name')]
-            payments = [r[0] for r in con.execute('SELECT name FROM payment_methods ORDER BY name')]
-            parts = {}
-            for row in con.execute('SELECT * FROM items ORDER BY id'):
-                parts.setdefault(row['transaction_id'], []).append(dict(name=row['name'], amount=row['amount'], category=row['category'], group=row['group_name']))
-            receipt_ids = {r[0] for r in con.execute('SELECT transaction_id FROM receipt_images')}
-            receipt_size = con.execute('SELECT COALESCE(SUM(length(image)),0),COALESCE(MAX(length(image)),0) FROM receipt_images').fetchone()
-            if receipt_size[0] > 512_000_000 or receipt_size[1] > 4_000_000:
-                raise ValueError('Receipt images exceed the Android backup limits.')
-            entries = []
-            for row in con.execute('SELECT * FROM transactions ORDER BY date DESC,id DESC'):
-                entries.append(dict(id=row['id'], date=row['date'], merchant=row['merchant'], amount=row['amount'], category=row['category'], payment=row['payment_method'], kind=row['kind'], notes=row['notes'], group=row['group_name'], parts=parts.get(row['id'], []), receipt=row['id'] in receipt_ids, counterparty=row['counterparty_iban'], import_key=row['import_key']))
-            accounts = [dict(name=r['payment_method'], share=r['share_bp'], share_income=bool(r['share_income']), iban=r['iban']) for r in con.execute('SELECT * FROM account_settings')]
-            def pairs(table):
-                return [dict(outgoing=r['outgoing_id'], incoming=r['incoming_id']) for r in con.execute('SELECT outgoing_id,incoming_id FROM ' + table)]
-            meta = dict(format='kassensturz-android', version=1, categories=categories, payments=payments, entries=entries, accounts=accounts, transfers=pairs('transfer_links'), ignored=pairs('transfer_ignored'))
-            # A renamed server default is still represented by its category alias.
-            if con.execute("SELECT 1 FROM category_aliases WHERE alias='Ausgehen'").fetchone():
-                meta['category_defaults_version'] = 1
-            encoded = json.dumps(meta, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-            if len(encoded) > 16_000_000 or len(entries) > 50000 or len(categories) > 2000 or len(payments) > 2000:
-                raise ValueError('Dataset exceeds the Android backup limits.')
-            # Exclusive create: never overwrite an existing backup. Restrict before writing.
-            fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            created = True
-            with os.fdopen(fd, 'wb') as file, zipfile.ZipFile(file, 'w', zipfile.ZIP_DEFLATED) as archive:
-                archive.writestr('data.json', encoded)
-                for row in con.execute('SELECT transaction_id,image FROM receipt_images ORDER BY transaction_id'):
-                    archive.writestr(f"receipts/{row['transaction_id']}.jpg", row['image'])
-            return len(entries), len(receipt_ids)
+        fd = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        created = True
+        with os.fdopen(fd, 'wb') as file:
+            return write_archive(source, file)
     except BaseException:
         if created:
             output.unlink(missing_ok=True)

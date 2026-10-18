@@ -3,6 +3,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     DATA_DIR=/data \
+    TMPDIR=/data \
     PORT=8080 \
     OMP_THREAD_LIMIT=1
 RUN apt-get update \
@@ -14,7 +15,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt VERSION ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py ./
+COPY app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py backups.py ./
 COPY sample-data ./sample-data
 COPY static ./static
 COPY tests ./tests

@@ -391,7 +391,7 @@ bis der Benutzer es nach dem Test manuell abschließt.
 
 ### Gemeinsame Versionsnummer
 
-Aktueller gemeinsamer Versionsname: **0.4.0**. Die Datei `VERSION` im Repository-
+Aktueller gemeinsamer Versionsname: **0.5.0**. Die Datei `VERSION` im Repository-
 Stamm ist die Quelle für Docker/Server und Android und wird auf beiden Branches
 gleich gehalten. Das Docker-Image enthält diese Datei; die Web-App zeigt die
 Version unter Einstellungen an. Android verwendet sie als `versionName`. Der
@@ -469,3 +469,34 @@ their occurrence counts. Other accounts remain independent. Matching uses the
 existing date/description/amount/account import identity, not fuzzy guesses:
 changed bank descriptions or overlapping partial exports without stable bank IDs
 can remain ambiguous. Manually entered lookalikes are not automatically removed.
+
+
+### File backup and restore (0.5.0)
+
+Server: under Einstellungen → Sicherung & Wiederherstellung, download a full ZIP
+for the currently selected user's private/demo dataset. It includes entries,
+splits, categories and renamed default aliases, payment/account settings, groups,
+transfer links/ignored pairs, CSV import identities and JPEG receipts. Credentials,
+sessions and other users are excluded; use the existing whole-volume procedure
+for an administrator's complete server/disaster-recovery backup.
+
+Select a ZIP to validate and preview its counts before confirming replacement of
+the current dataset. Validation uses isolated temporary storage; invalid archives
+leave live data unchanged. A valid restore replaces only financial tables in one
+transaction. Existing login accounts/sessions remain intact. Back up first.
+
+Android: Mehr → Vollständige Sicherung erstellen / Sicherung wiederherstellen.
+New ZIPs record source dataset/time; restore shows entry/receipt counts before
+confirmation. The complete archive is validated during transactional restore.
+Older native and server-account exports remain supported. Server ZIPs use the
+same portable format. Android ZIPs have no server category-alias history: on
+server restore missing standard aliases/default names are added without changing
+existing entry categories. No automatic two-way synchronization is performed.
+
+Limits: 50,000 entries, 2,000 categories/payment methods, 16 MB JSON metadata,
+4 MB per JPEG, 512 MB receipt data; server ZIP uploads at most 544 MB. Large
+server backups use temporary space in the writable data volume (not the 256 MB
+/tmp tmpfs); leave roughly three times the archive size free for upload, staging
+and transactional replacement. A reverse proxy may need a corresponding
+upload limit/timeout. ZIPs contain unencrypted private financial data: protect
+them and keep them outside Git. CSV is a spreadsheet export, not a full backup.

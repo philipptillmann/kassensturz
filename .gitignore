@@ -10,3 +10,4 @@ secrets/
 *.sqlite3*
 *.db
 *.tar.gz
+*.zip
