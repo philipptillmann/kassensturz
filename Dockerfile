@@ -15,11 +15,12 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt VERSION ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py backups.py ./
+COPY app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py backups.py shortcut_api.py ./
 COPY sample-data ./sample-data
 COPY static ./static
 COPY tests ./tests
 COPY tools ./tools
+COPY docs ./docs
 USER 10001:10001
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

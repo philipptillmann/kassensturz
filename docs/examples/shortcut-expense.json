@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-10-18T18:30:00+02:00",
+  "original_message": "24,50 Euro im Restaurant, bar bezahlt",
+  "ai": {
+    "title": "Restaurant",
+    "amount": "24.50",
+    "currency": "EUR",
+    "category": "Ausgehen",
+    "payment_method": "Bar",
+    "notes": ""
+  }
+}

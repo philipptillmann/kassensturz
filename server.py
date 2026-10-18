@@ -2,6 +2,7 @@
 import csv
 import hashlib
 import io
+import json
 import os
 import secrets
 import sqlite3
@@ -20,6 +21,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 import app as ledger
 import accounts
 import backups
+import shortcut_api
 import users
 from datasets import prepare_demo
 from receipts import OCRBusy
@@ -59,6 +61,7 @@ def create_app(password=None, public_url=None):
     ledger.init()
     auth_db = Path(ledger.DB)
     users.init(auth_db)
+    shortcut_api.init(auth_db)
     dataset_paths = {'private': ledger.DB, 'demo': ledger.DB.parent / 'demo.sqlite3'}
     prepare_demo(dataset_paths['demo'])
     # Apply additive category/schema migrations to every existing user's datasets.
@@ -76,6 +79,26 @@ def create_app(password=None, public_url=None):
 
     @web.before_request
     def access_control():
+        if request.path == '/json-import':
+            request.max_content_length = shortcut_api.MAX_BODY
+            if request.method != 'POST':
+                return failure('POST erwartet.', 405)
+            expected_origin = public_url or request.host_url.rstrip('/')
+            if request.headers.get('Origin') not in (None, expected_origin):
+                return failure('Ungültiger Ursprung.', 403)
+            if not request.is_json:
+                return failure('JSON erwartet.', 415)
+            identity = shortcut_api.authenticate(auth_db, request.headers.get('Authorization'))
+            if identity is None:
+                response = jsonify(error='Gültiger Kurzbefehls-Schlüssel erforderlich.')
+                response.status_code = 401
+                response.headers['WWW-Authenticate'] = 'Bearer realm="Kassensturz Shortcuts"'
+                return response
+            g.user, g.dataset = identity
+            if request.args.get('dataset', g.dataset) != g.dataset:
+                return failure('Schlüssel gilt für einen anderen Datensatz.', 403)
+            g.dataset_paths = users.paths(auth_db, g.user)
+            return None
         backup_upload = request.path in ('/api/backup-preview', '/api/backup-restore')
         if backup_upload:
             request.max_content_length = backups.MAX_ARCHIVE_BYTES
@@ -133,7 +156,7 @@ def create_app(password=None, public_url=None):
     @web.errorhandler(HTTPException)
     def http_error(error):
         if error.code == 413:
-            return failure('Sicherung zu groß (maximal 544 MB).' if request.path.startswith('/api/backup') else 'Datei zu groß (maximal 12 MB für Rechnungsbilder).', 413)
+            return failure('Kurzbefehlsanfrage zu groß (maximal 256 KiB).' if request.path == '/json-import' else 'Sicherung zu groß (maximal 544 MB).' if request.path.startswith('/api/backup') else 'Datei zu groß (maximal 12 MB für Rechnungsbilder).', 413)
         return failure(error.description, error.code)
 
     @web.errorhandler(ValueError)
@@ -222,6 +245,45 @@ def create_app(password=None, public_url=None):
     def session_info():
         return jsonify(csrf=g.csrf, user=users.public(g.user), needs_migration=g.user is None, version=APP_VERSION)
 
+    @web.post('/json-import')
+    def import_shortcut():
+        try:
+            result, status = shortcut_api.ingest(request.get_json(), g.dataset_paths[g.dataset])
+            return jsonify(result), status
+        except shortcut_api.DeletedImport as error:
+            return failure(str(error), 409)
+        except ValueError as error:
+            return failure(str(error), 422)
+
+    @web.route('/api/shortcut-tokens', methods=['GET', 'POST'])
+    def shortcut_tokens():
+        if g.user is None:
+            return failure('Bitte zuerst ein Benutzerkonto anlegen.', 409)
+        if request.method == 'GET':
+            return jsonify(tokens=shortcut_api.token_list(auth_db, g.user))
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return failure('JSON-Objekt erwartet.')
+        return jsonify(shortcut_api.create_token(auth_db, g.user, data)), 201
+
+    @web.post('/api/shortcut-tokens/revoke')
+    def revoke_shortcut_token():
+        if g.user is None:
+            return failure('Bitte zuerst ein Benutzerkonto anlegen.', 409)
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return failure('JSON-Objekt erwartet.')
+        shortcut_api.revoke_token(auth_db, g.user, data.get('id'))
+        return jsonify(ok=True)
+
+    @web.get('/api/shortcut-source/<int:transaction_id>')
+    def shortcut_source(transaction_id):
+        with data_connect() as con:
+            source = con.execute('SELECT payload,created_at FROM shortcut_imports WHERE transaction_id=?', (transaction_id,)).fetchone()
+        if source is None:
+            return failure('Kurzbefehlsquelle nicht gefunden.', 404)
+        return jsonify(payload=json.loads(source['payload']),created_at=source['created_at'])
+
     @web.get('/api/auth-status')
     def auth_status():
         with ledger.connect(auth_db) as con:
@@ -280,7 +342,7 @@ def create_app(password=None, public_url=None):
     def data():
         accounts.reconcile_transfers(g.dataset_paths[g.dataset])
         with data_connect() as con:
-            transactions = [dict(x) for x in con.execute('SELECT transactions.*, EXISTS(SELECT 1 FROM receipt_images WHERE transaction_id=transactions.id) AS has_receipt FROM transactions ORDER BY date DESC,id DESC')]
+            transactions = [dict(x) for x in con.execute('SELECT transactions.*, EXISTS(SELECT 1 FROM receipt_images WHERE transaction_id=transactions.id) AS has_receipt, EXISTS(SELECT 1 FROM shortcut_imports WHERE transaction_id=transactions.id) AS has_shortcut_source FROM transactions ORDER BY date DESC,id DESC')]
             all_items = {}
             for item in con.execute('SELECT * FROM items ORDER BY id'):
                 all_items.setdefault(item['transaction_id'], []).append(dict(item))

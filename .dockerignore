@@ -18,3 +18,9 @@
 !tools/
 !tools/*.py
 !backups.py
+!shortcut_api.py
+!docs/
+!docs/*.md
+!docs/*.txt
+!docs/examples/
+!docs/examples/*.json

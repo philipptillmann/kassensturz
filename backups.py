@@ -10,13 +10,14 @@ import zipfile
 
 import app as ledger
 import accounts
+import shortcut_api
 from tools.export_android import write_archive
 
 MAX_ARCHIVE_BYTES = 544_000_000
 MAX_METADATA = 16_000_000
 MAX_RECEIPT = 4_000_000
 MAX_RECEIPTS = 512_000_000
-TABLES = ('transfer_ignored', 'transfer_links', 'receipt_images', 'items',
+TABLES = ('shortcut_imports', 'transfer_ignored', 'transfer_links', 'receipt_images', 'items',
           'transactions', 'account_settings', 'category_aliases', 'payment_methods', 'categories')
 
 
@@ -158,6 +159,17 @@ def _insert_metadata(meta, con):
                 con.execute('INSERT INTO transfer_links VALUES (?,?,?)', (out,inc,integer(pair.get('manual',1),0,1)))
             else:
                 con.execute('INSERT INTO transfer_ignored VALUES (?,?)', (out,inc))
+    imports = meta.get('server_shortcut_imports', [])
+    if not isinstance(imports, list) or len(imports) > 50000:
+        raise ValueError('Zu viele Kurzbefehlsquellen.')
+    for source in imports:
+        identity = text(source['request_id'], 36, False)
+        payload = text(source['payload'], shortcut_api.MAX_BODY)
+        _, _, expected_id, _ = shortcut_api.envelope(json.loads(payload))
+        txid = source['transaction_id']
+        if identity != expected_id or txid is not None and integer(txid, 1) not in entries:
+            raise ValueError('Ungültige Kurzbefehlsquelle.')
+        con.execute('INSERT INTO shortcut_imports VALUES (?,?,?,?)', (identity,txid,payload,text(source['created_at'],100,False)))
     return receipts, {'entries': len(rows), 'receipts': len(receipts), 'categories': len(cats),
                       'dataset': text(meta.get('dataset','unknown'), 20),
                       'created_at': text(meta.get('created_at',''), 100)}

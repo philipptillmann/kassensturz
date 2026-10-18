@@ -41,7 +41,7 @@ $('rows').querySelectorAll('tr').forEach(row=>{row.onclick=()=>{const tx=all.fin
 function view(name){currentView=name;document.querySelector('.subline').hidden=['settings','graphs'].includes(name);$('overview').hidden=name!=='overview';$('ledger').hidden=!['overview','transactions'].includes(name);$('settings').hidden=name!=='settings';$('graphs').hidden=name!=='graphs';$('title').textContent={overview:'Übersicht',transactions:'Buchungen',settings:'Einstellungen',graphs:'Diagramme'}[name];document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));$('effectiveHint').hidden=$('costMode').value!=='effective'||!['overview','transactions'].includes(name);if(name==='graphs')renderGraphs()}
 
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>view(b.dataset.view));$('month').onchange=render;$('costMode').onchange=render;$('search').oninput=render;
-function openEditor(t=null,defaults={}){editing=t?.id||null;$('expenseForm').reset();receiptImage=null;removeReceipt=false;showReceipt(t);$('editTitle').textContent=t?'Buchung bearbeiten':defaults.payment_method==='Bar'?'Neue Barausgabe':'Neue Buchung';$('transactionKind').value=t?.kind||'expense';$('entryNotes').value=t?.notes||'';updateIncomeForm();$('merchant').value=t?.merchant||'';$('date').value=t?.date||today();$('amount').value=t?((t.kind==='income'?-t.amount:t.amount)/100).toFixed(2):'';$('category').innerHTML=options(t?.category);$('paymentMethod').innerHTML=paymentOptions(t?.payment_method??defaults.payment_method??'');$('groupName').value=t?.group_name||'';$('groupNames').innerHTML=[...new Set(state.transactions.flatMap(tx=>[tx.group_name,...tx.items.map(item=>item.group_name)]).filter(Boolean))].sort().map(name=>`<option value="${esc(name)}"></option>`).join('');$('items').replaceChildren();(t?.items||[]).forEach(i=>addItem({...i,amount:(t.kind==='income'?-i.amount:i.amount)/100}));$('delete').hidden=!t;$('editError').textContent='';$('ocrStatus').textContent='Texterkennung auf dem Server';$('ocrDetails').hidden=true;$('ocrText').textContent='';$('photo').value='';balance();$('editor').showModal()}
+function openEditor(t=null,defaults={}){editing=t?.id||null;showShortcutSource(t);$('expenseForm').reset();receiptImage=null;removeReceipt=false;showReceipt(t);$('editTitle').textContent=t?'Buchung bearbeiten':defaults.payment_method==='Bar'?'Neue Barausgabe':'Neue Buchung';$('transactionKind').value=t?.kind||'expense';$('entryNotes').value=t?.notes||'';updateIncomeForm();$('merchant').value=t?.merchant||'';$('date').value=t?.date||today();$('amount').value=t?((t.kind==='income'?-t.amount:t.amount)/100).toFixed(2):'';$('category').innerHTML=options(t?.category);$('paymentMethod').innerHTML=paymentOptions(t?.payment_method??defaults.payment_method??'');$('groupName').value=t?.group_name||'';$('groupNames').innerHTML=[...new Set(state.transactions.flatMap(tx=>[tx.group_name,...tx.items.map(item=>item.group_name)]).filter(Boolean))].sort().map(name=>`<option value="${esc(name)}"></option>`).join('');$('items').replaceChildren();(t?.items||[]).forEach(i=>addItem({...i,amount:(t.kind==='income'?-i.amount:i.amount)/100}));$('delete').hidden=!t;$('editError').textContent='';$('ocrStatus').textContent='Texterkennung auf dem Server';$('ocrDetails').hidden=true;$('ocrText').textContent='';$('photo').value='';balance();$('editor').showModal()}
 function addItem(i={name:'',amount:'',category:null,group_name:null}){const div=document.createElement('div');div.className='item';div.innerHTML=`<input class="itemname" aria-label="Artikelname" placeholder="Artikel" required value="${esc(i.name)}"><span class="amount-entry"><input class="itemamount" aria-label="Artikelbetrag" inputmode="decimal" placeholder="0,00" required value="${esc(i.amount)}"><button class="item-sign" type="button" aria-label="Vorzeichen des Artikelbetrags wechseln" title="Vorzeichen wechseln">+/−</button></span><select class="itemcategory" aria-label="Artikelkategorie">${options(i.category)}</select><button class="remove-item" type="button" aria-label="Position entfernen">×</button><div class="item-group"><select class="itemgroupmode" aria-label="Gruppenzuordnung der Position"><option value="inherit">Buchungsgruppe übernehmen</option><option value="none">Keine Gruppe</option><option value="own">Eigene Gruppe</option></select><input class="itemgroupname" aria-label="Gruppe der Position" list="groupNames" maxlength="80" placeholder="Gruppenname" value="${esc(i.group_name||'')}"></div>`;const mode=div.querySelector('.itemgroupmode'),groupInput=div.querySelector('.itemgroupname');mode.value=i.group_name==null?'inherit':i.group_name===''?'none':'own';const updateGroup=()=>{groupInput.hidden=mode.value!=='own';groupInput.disabled=mode.value!=='own';groupInput.required=mode.value==='own'};mode.onchange=updateGroup;updateGroup();div.querySelector('.remove-item').onclick=()=>{div.remove();balance()};div.querySelector('.item-sign').onclick=()=>toggleAmountSign(div.querySelector('.itemamount'));div.querySelector('.itemamount').oninput=balance;$('items').append(div);updateIncomeForm();balance()}
 function toggleAmountSign(input){const raw=input.value.trim().replace(/^\+/,'');input.value=raw.startsWith('-')?raw.slice(1):'-'+raw;balance();input.focus();input.setSelectionRange(input.value.length,input.value.length)}
 $('amountSign').onclick=()=>toggleAmountSign($('amount'));
@@ -59,6 +59,7 @@ async function boot(){const session=await api('session');csrf=session.csrf;$('ap
 $('migrationBox').hidden=!session.needs_migration;$('passwordForm').hidden=!session.user;
 $('userIdentity').textContent=session.user?'Angemeldet als '+session.user.username:'Bisheriges App-Passwort · Bitte unter Einstellungen ein Benutzerkonto anlegen.';
 $('adminBox').hidden=!session.user?.is_admin;
+$('shortcutKeysUnavailable').hidden=!!session.user;$('shortcutKeys').hidden=!session.user;if(session.user)await loadShortcutKeys();
 if(session.user?.is_admin)await loadUsers();await refresh();
 if(session.needs_migration)notice('Bitte unter Einstellungen die bestehenden Daten einem Benutzerkonto zuordnen.');}
 async function loadUsers(){const data=await api('users');$('userList').textContent=data.users.map(u=>u.username+(u.is_admin?' (Administrator)':'')).join(', ')}
@@ -174,3 +175,26 @@ $('backupFile').onchange=async()=>{
     await refresh();notice('Sicherung wiederhergestellt.');
   }catch(error){notice(error.message)}finally{$('backupFile').value=''}
 };
+
+
+async function loadShortcutKeys(){
+  const result=await api('shortcut-tokens');
+  $('shortcutKeyList').innerHTML=result.tokens.map(key=>`<div class="account-row"><b>${esc(key.label)}</b> · ${key.dataset==='demo'?'Demo':'Privat'} · ${key.active?'Aktiv':'Inaktiv'} ${key.active?`<button type="button" data-key="${key.id}">Widerrufen</button>`:''}</div>`).join('')||'<p class="muted">Noch keine Schlüssel.</p>';
+  $('shortcutKeyList').querySelectorAll('[data-key]').forEach(button=>button.onclick=async()=>{
+    if(!confirm('Diesen Schlüssel widerrufen? Der zugehörige Kurzbefehl kann danach keine Ausgaben mehr anlegen.'))return;
+    try{await api('shortcut-tokens/revoke',{id:Number(button.dataset.key)});await loadShortcutKeys();notice('Schlüssel widerrufen.')}catch(error){notice(error.message)}
+  });
+}
+$('shortcutKeyForm').onsubmit=async event=>{
+  event.preventDefault();const button=event.submitter;button.disabled=true;
+  try{const key=await api('shortcut-tokens',{label:$('shortcutKeyLabel').value,dataset:$('shortcutKeyDataset').value});$('shortcutKeyValue').value=key.token;$('shortcutKeyCreated').hidden=false;await loadShortcutKeys()}catch(error){notice(error.message)}finally{button.disabled=false}
+};
+$('hideShortcutKey').onclick=()=>{$('shortcutKeyValue').value='';$('shortcutKeyCreated').hidden=true};
+$('copyShortcutKey').onclick=async()=>{
+  const field=$('shortcutKeyValue');field.focus();field.select();
+  try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(field.value);else if(!document.execCommand('copy'))throw Error();notice('Schlüssel kopiert.')}catch{notice('Schlüssel ist markiert. Bitte über das Kopiermenü kopieren.')}
+};
+function showShortcutSource(tx){
+  const details=$('shortcutSource');details.hidden=!tx?.has_shortcut_source;details.open=false;$('shortcutSourceText').textContent='';
+  details.ontoggle=async()=>{if(!details.open||!tx?.has_shortcut_source||$('shortcutSourceText').textContent)return;$('shortcutSourceText').textContent='Laden …';try{const source=await api('shortcut-source/'+tx.id);if(editing===tx.id&&$('editor').open)$('shortcutSourceText').textContent=JSON.stringify(source.payload,null,2)}catch(error){if(editing===tx.id)$('shortcutSourceText').textContent=error.message}};
+}

@@ -73,6 +73,11 @@ def write_archive(source, output, dataset=None):
         if con.execute("SELECT 1 FROM category_aliases WHERE alias='Ausgehen'").fetchone():
             meta['category_defaults_version'] = 1
         meta['server_aliases'] = dict(con.execute('SELECT alias,name FROM category_aliases'))
+        if con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='shortcut_imports'").fetchone():
+            count, size = con.execute('SELECT count(*),COALESCE(SUM(length(CAST(payload AS BLOB))),0) FROM shortcut_imports').fetchone()
+            if count > 50000 or size > 16_000_000:
+                raise ValueError('Shortcut history exceeds the portable backup limits.')
+            meta['server_shortcut_imports'] = [dict(r) for r in con.execute('SELECT * FROM shortcut_imports ORDER BY request_id')]
         meta['created_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         if dataset is not None:
             meta['dataset'] = dataset

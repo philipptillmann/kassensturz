@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import csv, datetime, hashlib, io, json, os, re, sqlite3
+from contextlib import nullcontext
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -26,6 +27,7 @@ def init(db=None):
         CREATE TABLE IF NOT EXISTS transactions(id INTEGER PRIMARY KEY, date TEXT NOT NULL, merchant TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name), import_key TEXT UNIQUE);
         CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, name TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name));
         CREATE TABLE IF NOT EXISTS receipt_images(transaction_id INTEGER PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE, image BLOB NOT NULL);
+        CREATE TABLE IF NOT EXISTS shortcut_imports(request_id TEXT PRIMARY KEY,transaction_id INTEGER REFERENCES transactions(id) ON DELETE SET NULL,payload TEXT NOT NULL,created_at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS account_settings(payment_method TEXT PRIMARY KEY REFERENCES payment_methods(name), share_bp INTEGER NOT NULL, share_income INTEGER NOT NULL, iban TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS transfer_links(outgoing_id INTEGER PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE,incoming_id INTEGER UNIQUE NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,manual INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS transfer_ignored(outgoing_id INTEGER REFERENCES transactions(id) ON DELETE CASCADE,incoming_id INTEGER REFERENCES transactions(id) ON DELETE CASCADE,PRIMARY KEY(outgoing_id,incoming_id));
@@ -72,7 +74,7 @@ def read_csv(text):
     if not reader.fieldnames or not rows: raise ValueError('CSV enthält keine Buchungen.')
     return reader.fieldnames, rows
 
-def save_transaction(d, db=None):
+def save_transaction(d, db=None, *, _connection=None):
     receipt = None
     if 'receipt_image' in d:
         from receipts import prepare_jpeg
@@ -84,7 +86,7 @@ def save_transaction(d, db=None):
         raise ValueError('Beleg nicht gleichzeitig ersetzen und entfernen.')
     kind = d.get('kind', 'expense')
     if d.get('id') and 'kind' not in d:
-        with connect(db) as con:
+        with (nullcontext(_connection) if _connection is not None else connect(db)) as con:
             row = con.execute('SELECT kind FROM transactions WHERE id=?', (int(d['id']),)).fetchone()
             if row:
                 kind = row['kind']
@@ -111,7 +113,7 @@ def save_transaction(d, db=None):
     if any(not x[0] for x in converted): raise ValueError('Jede Position benötigt einen Namen.')
     if converted and sum(x[1] for x in converted) != amount:
         raise ValueError('Die Summe der Positionen muss exakt dem Buchungsbetrag entsprechen.')
-    with connect(db) as c:
+    with (nullcontext(_connection) if _connection is not None else connect(db)) as c:
         notes = d.get('notes')
         if 'notes' in d and (not isinstance(notes, str) or len(notes) > 4000):
             raise ValueError('Notizen dürfen höchstens 4000 Zeichen enthalten.')
