@@ -151,9 +151,50 @@ def save_transaction(d, db=None, *, _connection=None):
             c.execute('DELETE FROM receipt_images WHERE transaction_id=?', (txid,))
     return {'id': txid}
 
+TR_HEADERS = {'datetime', 'date', 'account_type', 'category', 'type', 'name', 'amount', 'currency', 'transaction_id', 'counterparty_iban', 'description', 'asset_class'}
+TR_TYPES = {'CARD_TRANSACTION', 'TRANSFER_INSTANT_OUTBOUND', 'TRANSFER_INSTANT_INBOUND', 'TRANSFER_OUTBOUND', 'TRANSFER_INBOUND'}
+
+def trade_republic(headers):
+    return TR_HEADERS.issubset(set(headers))
+
+def tr_rows(rows, payment):
+    """Only confirmed cash payment types; never infer investment/tax semantics."""
+    result, excluded = [], []
+    if not payment: raise ValueError('Für Trade Republic bitte ein Zahlungsmittel auswählen.')
+    for index, row in enumerate(rows, 2):
+        try:
+            if row['category'] != 'CASH' or row['type'] not in TR_TYPES or row['asset_class'].strip():
+                excluded.append({'line': index, 'type': row['type'], 'reason': 'Nicht unterstützte Buchungsart / Anlagebuchung'})
+                continue
+            if row['currency'] != 'EUR': raise ValueError('Nur EUR wird unterstützt')
+            if not row['transaction_id'].strip(): raise ValueError('Transaktions-ID fehlt')
+            value = cents(row['amount'])
+            if not value:
+                excluded.append({'line': index, 'type': row['type'], 'reason': 'Nullbetrag'})
+                continue
+            merchant = (row['name'].strip() or row.get('counterparty_name', '').strip() or row['description'].strip())
+            if not merchant: raise ValueError('Bezeichnung fehlt')
+            if len(merchant)>200: raise ValueError('Bezeichnung zu lang')
+            day = date_value(row['date'])
+            iban = re.sub(r'\s+', '', row['counterparty_iban']).upper()
+            if len(iban)>34: raise ValueError('Gegenkonto zu lang')
+            base = '\0'.join(['trade-republic', payment, row['account_type'].strip(), row['transaction_id'].strip()])
+            key = 'tr:' + hashlib.sha256(base.encode()).hexdigest()
+            result.append((day, merchant, -value, 'Unkategorisiert', key, '', iban))
+        except (ValueError, KeyError, TypeError) as e:
+            raise ValueError(f'CSV-Zeile {index}: {e}')
+    return result, excluded
+
+def csv_excluded(d):
+    headers, rows = read_csv(d['text'])
+    return tr_rows(rows, d.get('payment_method', ''))[1] if trade_republic(headers) else []
+
 def _csv_plan(d, c):
-    _, rows = read_csv(d['text'])
+    headers, rows = read_csv(d['text'])
     prepared, occurrences = [], {}
+    if trade_republic(headers):
+        prepared, _ = tr_rows(rows, d.get('payment_method', ''))
+        rows = []
     for index, row in enumerate(rows, 2):
         try:
             date = date_value(row[d['date_column']])
@@ -193,7 +234,7 @@ def preview_import(d, db=None):
     with connect(db) as c:
         plan = _csv_plan(d, c)
     skipped = sum(row['duplicate'] for row in plan)
-    return {'added': len(plan)-skipped, 'skipped': skipped, 'rows': [
+    return {'added': len(plan)-skipped, 'skipped': skipped, 'excluded': csv_excluded(d), 'rows': [
         {'date': row['values'][0], 'merchant': row['values'][1], 'amount': row['values'][2], 'duplicate': row['duplicate']}
         for row in plan[:20]]}
 
@@ -204,7 +245,10 @@ def import_csv(d, db=None):
         plan = _csv_plan(d, c)
         new = [row['values'] for row in plan if not row['duplicate']]
         c.executemany('INSERT INTO transactions(date,merchant,amount,category,import_key,payment_method,counterparty_iban) VALUES (?,?,?,?,?,?,?)', new)
-    return {'added': len(new), 'skipped': len(plan)-len(new)}
+    result = {'added': len(new), 'skipped': len(plan)-len(new)}
+    excluded = csv_excluded(d)
+    if excluded: result['excluded'] = excluded
+    return result
 
 def rename_category(old, new, db=None):
     if not isinstance(old, str) or not isinstance(new, str) or not new.strip() or len(new.strip()) > 60:

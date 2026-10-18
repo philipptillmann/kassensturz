@@ -441,7 +441,7 @@ def create_app(password=None, public_url=None):
             result = ledger.save_transaction(data, db=g.dataset_paths[g.dataset])
         elif action == 'import-preview':
             columns, rows = ledger.read_csv(data['text'])
-            result = {'headers': columns, 'rows': rows[:3], 'count': len(rows)}
+            result = {'headers': columns, 'rows': rows[:3], 'count': len(rows), 'provider': 'trade-republic' if ledger.trade_republic(columns) else None}
         elif action == 'import-check':
             result = ledger.preview_import(data, db=g.dataset_paths[g.dataset])
         elif action == 'import':
