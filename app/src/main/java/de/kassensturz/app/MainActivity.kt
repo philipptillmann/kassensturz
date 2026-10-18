@@ -361,8 +361,11 @@ class MainActivity : Activity() {
         when(requestCode) {
             101 -> work({ contentResolver.openOutputStream(uri,"wt")?.use { store.backup(it) } ?: error("Zieldatei konnte nicht geöffnet werden.") }) { toast("Sicherung erstellt.") }
             102 -> work({ contentResolver.openOutputStream(uri,"wt")?.bufferedWriter(Charsets.UTF_8)?.use { it.write(BankCsv.export(store.snapshot().entries)) } ?: error("Zieldatei konnte nicht geöffnet werden.") }) { toast("CSV exportiert.") }
-            103 -> confirm("${if(demo)"Demo" else "Privat"} ersetzen?","Die Sicherung ersetzt alle Buchungen, Einstellungen und Belege dieses Datensatzes. Vorher eine eigene Sicherung erstellen.") {
-                change({contentResolver.openInputStream(uri)?.use { store.restore(it) } ?: error("Datei konnte nicht geöffnet werden.")}) { toast("Sicherung wiederhergestellt.") }
+            103 -> work({contentResolver.openInputStream(uri)?.use { Store.inspectBackup(it) } ?: error("Datei konnte nicht geöffnet werden.")}) { summary ->
+                val source=when(summary.dataset) { "demo"->"Demo";"private"->"Privat";else->"nicht angegeben" }
+                confirm("${if(demo)"Demo" else "Privat"} ersetzen?","Sicherung: ${summary.entries} Buchungen, ${summary.receipts} Belege.\nQuelle: $source ${summary.createdAt}\n\nDie Sicherung ersetzt alle Buchungen, Einstellungen und Belege dieses Datensatzes. Vorher eine eigene Sicherung erstellen. Der vollständige Archivinhalt wird beim Wiederherstellen geprüft.") {
+                    change({contentResolver.openInputStream(uri)?.use { store.restore(it) } ?: error("Datei konnte nicht geöffnet werden.")}) { toast("Sicherung wiederhergestellt.") }
+                }
             }
             104 -> work({contentResolver.openInputStream(uri)?.use { Store.readLimited(it,8_000_000) } ?: error("CSV konnte nicht geöffnet werden.")}) { bytes ->
                 val utf8=Charsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)

@@ -140,10 +140,10 @@ This process does not use an Actions job or automatically mark tests as passed.
 
 ## Shared release version
 
-The current Docker/server and Android release name is **0.4.0**. Both branches
+The current Docker/server and Android release name is **0.5.0**. Both branches
 carry the same root `VERSION` file. Android Gradle reads it for `versionName`;
 the installed app displays its package version. `versionCode` is Android's
-internal upgrade counter and remains separate. The 0.4.0 source uses versionCode 6. Its APK build is pending explicit cost
+internal upgrade counter and remains separate. The 0.5.0 source uses versionCode 7. Its APK build is pending explicit cost
 approval; the previously published APK remains 0.1.0.
 
 ### 0.1.1 — reimbursement entry on mobile keyboards
@@ -190,3 +190,25 @@ their occurrence counts. Other accounts remain independent. Matching uses the
 existing date/description/amount/account import identity, not fuzzy guesses:
 changed bank descriptions or overlapping partial exports without stable bank IDs
 can remain ambiguous. Manually entered lookalikes are not automatically removed.
+
+
+### File backup and restore (0.5.0)
+
+Under **Mehr**, create a full ZIP for the selected private/demo dataset or choose
+**Sicherung wiederherstellen**. Before confirming replacement, the app now shows
+entry and receipt counts plus the source dataset/time when available. New ZIPs
+record that metadata; older ZIPs remain supported. Cancelling the preview leaves
+local data unchanged. The complete archive is validated during transactional
+restore; invalid data rolls back without replacing the existing dataset.
+
+Backups include entries, splits, categories, payment/account settings, groups,
+transfer decisions, import identities and JPEG receipts. Keep private ZIPs outside
+Git and back up the current dataset before replacement. CSV is not a full backup.
+The existing limits and installation instructions above still apply.
+
+The server now provides matching financial ZIP export/restore on its separate
+branch. For server-side operation and limits, see the
+[server instructions](https://github.com/philipptillmann/kassensturz/blob/server/README.md#file-backup-and-restore-050).
+The common portable format supports a one-time data copy, not synchronization;
+server-specific category aliases cannot be reconstructed from an Android-only
+backup that has never stored them.

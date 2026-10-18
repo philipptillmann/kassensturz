@@ -24,6 +24,8 @@ private fun JSONObject.exactLong(key: String): Long {
 private fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
 private fun JSONArray.strings() = (0 until length()).map { getString(it) }
 
+data class BackupSummary(val entries: Int, val receipts: Int, val dataset: String, val createdAt: String)
+
 data class Snapshot(val entries: List<Entry>, val categories: List<String>, val payments: List<String>, val accounts: List<Account>, val transfers: List<Transfer>, val ignored: List<Transfer> = emptyList())
 
 class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if (demo) "demo.sqlite3" else "private.sqlite3", null, 2) {
@@ -166,7 +168,7 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         val s=snapshot()
         require(s.entries.size <= 50000 && s.categories.size <= 2000 && s.payments.size <= 2000) { "Datensatz für dieses Sicherungsformat zu groß." }
         readableDatabase.rawQuery("SELECT COALESCE(SUM(length(image)),0) FROM receipts",null).use { c -> c.moveToFirst();require(c.getLong(0)<=512_000_000) { "Belege für dieses Sicherungsformat zu groß (max. 512 MB)." } }
-        val metadata=JSONObject().put("format","kassensturz-android").put("version",1).put("category_defaults_version",1)
+        val metadata=JSONObject().put("format","kassensturz-android").put("version",1).put("category_defaults_version",1).put("dataset",if(demo)"demo" else "private").put("created_at",java.time.Instant.now().toString())
             .put("categories",JSONArray(s.categories)).put("payments",JSONArray(s.payments))
             .put("entries",JSONArray().apply { s.entries.forEach { put(entryJson(it)) } })
             .put("accounts",JSONArray().apply { s.accounts.forEach { put(JSONObject().put("name",it.name).put("share",it.share).put("share_income",it.shareIncome).put("iban",it.iban)) } })
@@ -222,6 +224,14 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         }
     }
     companion object {
+        fun inspectBackup(input: InputStream): BackupSummary = ZipInputStream(input).use { zip ->
+            require(zip.nextEntry?.name == "data.json") { "Keine Kassensturz-Sicherung." }
+            val meta=JSONObject(readLimited(zip,16_000_000).toString(Charsets.UTF_8))
+            require(meta.getString("format")=="kassensturz-android" && meta.getInt("version")==1) { "Unbekanntes Sicherungsformat." }
+            val entries=meta.getJSONArray("entries").objects()
+            require(entries.size<=50000) { "Zu viele Buchungen." }
+            BackupSummary(entries.size,entries.count { it.getBoolean("receipt") },meta.optString("dataset","unknown").take(20),meta.optString("created_at","").take(100))
+        }
         fun readLimited(input: InputStream, max: Int): ByteArray {
             val out=java.io.ByteArrayOutputStream(); val buffer=ByteArray(8192)
             while(true) { val n=input.read(buffer); if(n<0) break; require(out.size()+n <= max) { "Datei ist zu groß." }; out.write(buffer,0,n) }

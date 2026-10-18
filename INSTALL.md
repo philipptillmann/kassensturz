@@ -30,6 +30,12 @@ Unter **Mehr → Vollständige Sicherung erstellen** eine ZIP-Datei außerhalb d
 App speichern. Sie enthält den ausgewählten Datensatz einschließlich Belegen.
 Privat und Demo werden getrennt gesichert.
 
+Beim Auswählen einer Sicherung zeigt die App vor dem Ersetzen die Anzahl der
+Buchungen und Belege sowie Datensatz und Zeitpunkt an, soweit diese Angaben
+in der Datei vorhanden sind. Abbrechen ändert keine Daten. Auch ältere ZIPs
+bleiben verwendbar; der vollständige Archivinhalt wird beim Wiederherstellen
+geprüft. Eine abgelehnte Sicherung lässt die bisherigen Daten unverändert.
+
 Eine neue APK über die vorhandene App installieren. Bei gleicher Signatur bleiben
 die Daten erhalten. Die aktuellen APKs sind Testversionen mit Debug-Signatur.
 Falls Android wegen einer abweichenden Signatur ein Update ablehnt, zuerst mit
