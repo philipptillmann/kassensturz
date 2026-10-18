@@ -243,3 +243,15 @@ Keep the same payment account name on repeat imports. Older generic CSV imports
 have different keys: do not reimport their date ranges without checking/removing
 existing entries. No fuzzy deduplication against manually entered records occurs.
 The supplied personal CSV is not included in the repository.
+
+### Undo CSV import (0.8.0)
+
+Under Import / Settings, choose **Letzten CSV-Import rückgängig machen**.
+The confirmation shows the latest import time and remaining entry count. Undo
+removes only entries newly inserted by that import, including subsequent edits,
+split items and receipts. Pre-existing duplicates and other entries remain.
+A failed or all-duplicate import does not replace the previous undo. Undo survives
+restart and is separate per dataset/user; it is one level, with no redo. Reverting
+also removes associated transfer links, leaving their other entries intact.
+Only imports made from this release onward can be undone. Restoring a full backup
+clears undo history; undo history is not exported in backups.

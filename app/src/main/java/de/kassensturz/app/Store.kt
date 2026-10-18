@@ -28,7 +28,7 @@ data class BackupSummary(val entries: Int, val receipts: Int, val dataset: Strin
 
 data class Snapshot(val entries: List<Entry>, val categories: List<String>, val payments: List<String>, val accounts: List<Account>, val transfers: List<Transfer>, val ignored: List<Transfer> = emptyList())
 
-class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if (demo) "demo.sqlite3" else "private.sqlite3", null, 2) {
+class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if (demo) "demo.sqlite3" else "private.sqlite3", null, 3) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE categories(name TEXT PRIMARY KEY NOT NULL)")
@@ -38,13 +38,31 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         db.execSQL("CREATE TABLE accounts(name TEXT PRIMARY KEY REFERENCES payments(name),share INTEGER NOT NULL,share_income INTEGER NOT NULL,iban TEXT NOT NULL)")
         db.execSQL("CREATE TABLE transfers(outgoing INTEGER PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE,incoming INTEGER UNIQUE REFERENCES entries(id) ON DELETE CASCADE)")
         db.execSQL("CREATE TABLE ignored(outgoing INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,incoming INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,PRIMARY KEY(outgoing,incoming))")
+        createCsvUndo(db)
         listOf("Unkategorisiert","Lebensmittel","Wohnen","Mobilität","Freizeit","Ausgehen","Shopping","Gesundheit","Gehalt","Geschenke","Sonstige Einnahmen").forEach { db.insertOrThrow("categories",null,values("name" to it)) }
         listOf("Bar","PayPal","Bankkarte").forEach { db.insertOrThrow("payments",null,values("name" to it)) }
         if (demo) seed(db)
     }
     override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) {
-        require(old >= 1 && new <= 2) { "Unbekannte Datenbankversion $old → $new" }
+        require(old >= 1 && new <= 3) { "Unbekannte Datenbankversion $old → $new" }
+        if(old < 3) createCsvUndo(db)
         if(old < 2) db.insertWithOnConflict("categories",null,values("name" to "Ausgehen"),SQLiteDatabase.CONFLICT_IGNORE)
+    }
+    private fun createCsvUndo(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE csv_undo(id INTEGER PRIMARY KEY CHECK(id=1),token TEXT NOT NULL,created_at TEXT NOT NULL)")
+        db.execSQL("CREATE TABLE csv_undo_entries(entry_id INTEGER PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE)")
+    }
+    data class CsvUndo(val token:String,val createdAt:String,val count:Int)
+    fun lastCsvImport(): CsvUndo? = readableDatabase.rawQuery("SELECT token,created_at,(SELECT count(*) FROM csv_undo_entries) FROM csv_undo WHERE id=1",null).use { c ->
+        if(c.moveToFirst()) CsvUndo(c.getString(0),c.getString(1),c.getInt(2)) else null
+    }
+    fun revertCsvImport(token:String): Int = transaction { db ->
+        val current=lastCsvImport()
+        require(current!=null && current.token==token) { "CSV-Import hat sich geändert oder wurde bereits rückgängig gemacht. Bitte erneut prüfen." }
+        val removed=db.delete("entries","id IN (SELECT entry_id FROM csv_undo_entries)",null)
+        db.delete("csv_undo_entries",null,null);db.delete("csv_undo",null,null)
+        reconcile()
+        removed
     }
     private fun partsJson(parts: List<Part>) = JSONArray().apply { parts.forEach { p -> put(JSONObject().put("name",p.name).put("amount",p.amount).put("category",p.category).put("group",p.group ?: JSONObject.NULL)) } }.toString()
     private fun parseParts(raw: String) = JSONArray(raw).objects().map { Part(it.getString("name"),it.exactLong("amount"),it.getString("category"),if (it.isNull("group")) null else it.getString("group")) }
@@ -139,7 +157,14 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         var imported=0; var skipped=0
         entries.forEach { e ->
             if(e.importKey != null && db.rawQuery("SELECT 1 FROM entries WHERE import_key=?",arrayOf(e.importKey)).use { it.moveToFirst() }) skipped++
-            else { putEntry(db,e.copy(id=0)); imported++ }
+            else {
+                if(imported==0) {
+                    db.delete("csv_undo_entries",null,null);db.delete("csv_undo",null,null)
+                    db.insertOrThrow("csv_undo",null,values("id" to 1,"token" to java.util.UUID.randomUUID().toString(),"created_at" to java.time.Instant.now().toString()))
+                }
+                val id=putEntry(db,e.copy(id=0))
+                db.insertOrThrow("csv_undo_entries",null,values("entry_id" to id));imported++
+            }
         }
         reconcile()
         imported to skipped
@@ -195,7 +220,7 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
             val rows=meta.getJSONArray("entries").objects()
             require(rows.size <= 50000) { "Zu viele Buchungen." }
             val expectedReceipts=mutableSetOf<Long>()
-            listOf("ignored","transfers","receipts","entries","accounts","payments","categories").forEach { db.delete(it,null,null) }
+            listOf("csv_undo_entries","csv_undo","ignored","transfers","receipts","entries","accounts","payments","categories").forEach { db.delete(it,null,null) }
             cats.forEach { db.insertOrThrow("categories",null,values("name" to it)) }; payments.forEach { db.insertOrThrow("payments",null,values("name" to it)) }
             rows.forEach { j ->
                 val e=Entry(id=j.exactLong("id"),date=j.getString("date"),merchant=j.getString("merchant"),amount=j.exactLong("amount"),category=j.getString("category"),payment=j.getString("payment"),kind=j.getString("kind"),notes=j.getString("notes"),group=j.getString("group"),parts=parseParts(j.getJSONArray("parts").toString()),counterparty=j.getString("counterparty"),importKey=if(j.isNull("import_key")) null else j.getString("import_key"))

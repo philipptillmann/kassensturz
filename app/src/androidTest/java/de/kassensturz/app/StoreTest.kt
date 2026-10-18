@@ -34,6 +34,47 @@ class StoreTest {
     }
     @After fun tearDown() { db.close();folder.deleteRecursively() }
     private fun entry()=Entry(date="2026-10-01",merchant="Gift",amount=5000,category="Shopping",payment="Bankkarte",group="Gift",notes="Keep me",parts=listOf(Part("A",3000,"Shopping","Gift"),Part("B",2000,"Freizeit","")))
+    @Test fun testCsvUndoUpgradeFromVersionTwoRetainsEntries() {
+        db.save(entry());db.close()
+        SQLiteDatabase.openDatabase(isolated.getDatabasePath("private.sqlite3").path,null,SQLiteDatabase.OPEN_READWRITE).use { sql ->
+            sql.execSQL("DROP TABLE csv_undo_entries");sql.execSQL("DROP TABLE csv_undo");sql.version=2
+        }
+        db=Store(isolated,false)
+        assertEquals(1,db.snapshot().entries.size);assertNull(db.lastCsvImport())
+        db.importEntries(listOf(entry().copy(importKey="csv:after-upgrade")))
+        assertEquals(1,db.lastCsvImport()!!.count)
+    }
+    @Test fun testCsvUndoKeepsDuplicatesAndManualEntriesAndSurvivesRestart() {
+        val old=entry().copy(group="",parts=emptyList(),importKey="csv:old")
+        val fresh=old.copy(merchant="New",importKey="csv:new")
+        db.importEntries(listOf(old));db.save(old.copy(merchant="Manual",importKey=null))
+        db.importEntries(listOf(old,fresh))
+        val batch=db.lastCsvImport()!!;assertEquals(1,batch.count)
+        db.importEntries(listOf(old,fresh));assertEquals(batch,db.lastCsvImport())
+        try { db.importEntries(listOf(fresh.copy(importKey="csv:invalid",category="Missing")));fail("Invalid import") } catch (_: IllegalArgumentException) { }
+        assertEquals(batch,db.lastCsvImport())
+        db.close();db=Store(isolated,false);assertEquals(batch,db.lastCsvImport())
+        assertEquals(1,db.revertCsvImport(batch.token))
+        assertEquals(setOf("Gift","Manual"),db.snapshot().entries.map { it.merchant }.toSet())
+        assertNull(db.lastCsvImport())
+        try { db.revertCsvImport(batch.token);fail("Undo twice") } catch (_: IllegalArgumentException) { }
+        assertEquals(1 to 0,db.importEntries(listOf(fresh)))
+    }
+    @Test fun testCsvUndoStaleConfirmationDeletedRowsAndRestore() {
+        val a=entry().copy(group="",parts=emptyList(),importKey="csv:a")
+        db.importEntries(listOf(a));val first=db.lastCsvImport()!!
+        db.importEntries(listOf(a.copy(importKey="csv:b")))
+        try { db.revertCsvImport(first.token);fail("Stale confirmation") } catch (_: IllegalArgumentException) { }
+        val current=db.lastCsvImport()!!
+        val id=db.snapshot().entries.single { it.importKey=="csv:b" }.id
+        db.delete(id);db.save(a.copy(merchant="Manual",importKey=null))
+        assertEquals(0,db.revertCsvImport(current.token))
+        assertEquals(2,db.snapshot().entries.size)
+        db.importEntries(listOf(a.copy(importKey="csv:c")))
+        val output=ByteArrayOutputStream();db.backup(output)
+        db.restore(ByteArrayInputStream(output.toByteArray()))
+        assertNull(db.lastCsvImport());assertEquals(3,db.snapshot().entries.size)
+    }
     @Test fun testCrudRestartAndCategoryRename() {
         val id=db.save(entry());db.renameCategory("Shopping","Einkäufe")
         val saved=db.snapshot().entries.single();assertEquals("Einkäufe",saved.category);assertEquals("Einkäufe",saved.parts[0].category)

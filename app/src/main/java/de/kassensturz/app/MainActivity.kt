@@ -233,6 +233,14 @@ class MainActivity : Activity() {
         } }
         val files=box(content);label(files,"Import & Sicherung",20f,true)
         button(files,"Bank-CSV importieren") { pendingDataset=demo;openDocument(104,"*/*") }
+        button(files,"Letzten CSV-Import rückgängig machen") {
+            work({store.lastCsvImport()}) { batch ->
+                if(batch==null) toast("Kein rückgängig machbarer CSV-Import in diesem Datensatz.")
+                else confirm("CSV-Import rückgängig machen?", "Datensatz: ${if(demo) "Demo" else "Privat"} · ${batch.createdAt}\n\n${batch.count} noch vorhandene importierte Buchungen werden gelöscht, einschließlich späterer Änderungen, Positionen und Belege. Bereits vorher vorhandene Buchungen bleiben erhalten. Dies kann nicht rückgängig gemacht werden.") {
+                    change({store.revertCsvImport(batch.token)}) { toast("CSV-Import rückgängig gemacht.") }
+                }
+            }
+        }
         button(files,"CSV exportieren") { pendingDataset=demo;createDocument(102,"text/csv","kassensturz-${if(demo) "demo" else "privat"}.csv") }
         button(files,"Vollständige Sicherung erstellen") { pendingDataset=demo;createDocument(101,"application/zip","kassensturz-${if(demo) "demo" else "privat"}-${LocalDate.now()}.zip") }
         button(files,"Sicherung wiederherstellen") { pendingDataset=demo;openDocument(103,"application/zip") }
