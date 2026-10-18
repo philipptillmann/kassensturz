@@ -149,7 +149,7 @@ def save_transaction(d, db=None):
             c.execute('DELETE FROM receipt_images WHERE transaction_id=?', (txid,))
     return {'id': txid}
 
-def import_csv(d, db=None):
+def _csv_plan(d, c):
     _, rows = read_csv(d['text'])
     prepared, occurrences = [], {}
     for index, row in enumerate(rows, 2):
@@ -171,21 +171,38 @@ def import_csv(d, db=None):
                     raise ValueError('Gegenkonto ist zu lang')
             prepared.append((date,merchant,amount,'Unkategorisiert',key,legacy_key,counterpart))
         except (ValueError, KeyError, TypeError) as e: raise ValueError(f'CSV-Zeile {index}: {e}')
+    payment = d.get('payment_method', '')
+    if not isinstance(payment, str) or payment and not c.execute('SELECT 1 FROM payment_methods WHERE name=?', (payment,)).fetchone():
+        raise ValueError('Unbekanntes Zahlungsmittel.')
+    category = c.execute("SELECT name FROM category_aliases WHERE alias='Unkategorisiert'").fetchone()[0]
+    existing = {row['import_key']: row['payment_method'] for row in c.execute('SELECT import_key,payment_method FROM transactions WHERE import_key IS NOT NULL')}
+    seen = set(existing)
+    plan = []
+    for date,merchant,amount,_,key,legacy_key,counterpart in prepared:
+        if legacy_key in existing and existing[legacy_key] == payment:
+            key = legacy_key
+        duplicate = key in seen
+        seen.add(key)
+        plan.append({'values': (date,merchant,amount,category,key,payment,counterpart), 'duplicate': duplicate})
+    return plan
+
+def preview_import(d, db=None):
+    """Read-only duplicate forecast; the committing import always rechecks."""
     with connect(db) as c:
-        payment = d.get('payment_method', '')
-        if not isinstance(payment, str) or payment and not c.execute('SELECT 1 FROM payment_methods WHERE name=?', (payment,)).fetchone():
-            raise ValueError('Unbekanntes Zahlungsmittel.')
-        category = c.execute("SELECT name FROM category_aliases WHERE alias='Unkategorisiert'").fetchone()[0]
-        mapped = []
-        for date,merchant,amount,_,key,legacy_key,counterpart in prepared:
-            old = c.execute('SELECT payment_method FROM transactions WHERE import_key=?', (legacy_key,)).fetchone()
-            if old and old['payment_method'] == payment:
-                key = legacy_key
-            mapped.append((date,merchant,amount,category,key,payment,counterpart))
-        before = c.total_changes
-        c.executemany('INSERT OR IGNORE INTO transactions(date,merchant,amount,category,import_key,payment_method,counterparty_iban) VALUES (?,?,?,?,?,?,?)',mapped)
-        added = c.total_changes-before
-    return {'added':added,'skipped':len(prepared)-added}
+        plan = _csv_plan(d, c)
+    skipped = sum(row['duplicate'] for row in plan)
+    return {'added': len(plan)-skipped, 'skipped': skipped, 'rows': [
+        {'date': row['values'][0], 'merchant': row['values'][1], 'amount': row['values'][2], 'duplicate': row['duplicate']}
+        for row in plan[:20]]}
+
+def import_csv(d, db=None):
+    # Serialize duplicate checks with insertion, including concurrent browser imports.
+    with connect(db) as c:
+        c.execute('BEGIN IMMEDIATE')
+        plan = _csv_plan(d, c)
+        new = [row['values'] for row in plan if not row['duplicate']]
+        c.executemany('INSERT INTO transactions(date,merchant,amount,category,import_key,payment_method,counterparty_iban) VALUES (?,?,?,?,?,?,?)', new)
+    return {'added': len(new), 'skipped': len(plan)-len(new)}
 
 def rename_category(old, new, db=None):
     if not isinstance(old, str) or not isinstance(new, str) or not new.strip() or len(new.strip()) > 60:

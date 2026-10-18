@@ -334,6 +334,8 @@ def create_app(password=None, public_url=None):
         elif action == 'import-preview':
             columns, rows = ledger.read_csv(data['text'])
             result = {'headers': columns, 'rows': rows[:3], 'count': len(rows)}
+        elif action == 'import-check':
+            result = ledger.preview_import(data, db=g.dataset_paths[g.dataset])
         elif action == 'import':
             result = ledger.import_csv(data, db=g.dataset_paths[g.dataset])
         elif action == 'ocr':

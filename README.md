@@ -391,7 +391,7 @@ bis der Benutzer es nach dem Test manuell abschließt.
 
 ### Gemeinsame Versionsnummer
 
-Aktueller gemeinsamer Versionsname: **0.3.1**. Die Datei `VERSION` im Repository-
+Aktueller gemeinsamer Versionsname: **0.4.0**. Die Datei `VERSION` im Repository-
 Stamm ist die Quelle für Docker/Server und Android und wird auf beiden Branches
 gleich gehalten. Das Docker-Image enthält diese Datei; die Web-App zeigt die
 Version unter Einstellungen an. Android verwendet sie als `versionName`. Der
@@ -458,3 +458,14 @@ auch bei der nativen Darstellung in Safari. Formularspalten und Beschriftungen
 können schrumpfen, sodass das Datumsfeld den Buchungseditor nicht seitlich
 verbreitert. Der native Android-Editor verwendet ein einzeiliges Datumsfeld in
 Dialogbreite. Gespeicherte Daten und das Datumsformat bleiben unverändert.
+
+
+### CSV duplicate preview (0.4.0)
+
+Before committing a CSV import, the app reports new and already imported entries
+for the selected account and dataset. Cancelling changes nothing; saving rechecks
+against the latest data. Identical genuine purchases within one statement keep
+their occurrence counts. Other accounts remain independent. Matching uses the
+existing date/description/amount/account import identity, not fuzzy guesses:
+changed bank descriptions or overlapping partial exports without stable bank IDs
+can remain ambiguous. Manually entered lookalikes are not automatically removed.

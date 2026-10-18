@@ -142,7 +142,13 @@ class ServerTests(unittest.TestCase):
     def test_import_persists_and_duplicates_are_skipped(self):
         csrf = self.login()
         data = {'text': 'Datum;Händler;Betrag\n05.10.2026;Cafe;-4,50\n', 'date_column': 'Datum', 'merchant_column': 'Händler', 'amount_column': 'Betrag'}
+        preview = self.post('/api/import-check', data, csrf)
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual((preview.json['added'], preview.json['skipped']), (1, 0))
+        self.assertEqual(self.client.get('/api/data').json['transactions'], [])
         self.assertEqual(self.post('/api/import', data, csrf).json, {'added': 1, 'skipped': 0})
+        preview = self.post('/api/import-check', data, csrf)
+        self.assertEqual((preview.json['added'], preview.json['skipped']), (0, 1))
         self.assertEqual(self.post('/api/import', data, csrf).json, {'added': 0, 'skipped': 1})
         restarted = create_app(password=PASSWORD, public_url='').test_client()
         self.login(restarted)
