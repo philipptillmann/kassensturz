@@ -140,10 +140,10 @@ This process does not use an Actions job or automatically mark tests as passed.
 
 ## Shared release version
 
-The current Docker/server and Android release name is **0.3.0**. Both branches
+The current Docker/server and Android release name is **0.3.1**. Both branches
 carry the same root `VERSION` file. Android Gradle reads it for `versionName`;
 the installed app displays its package version. `versionCode` is Android's
-internal upgrade counter and remains separate. The 0.3.0 source uses versionCode 4. Its APK build is pending explicit cost
+internal upgrade counter and remains separate. The 0.3.1 source uses versionCode 5. Its APK build is pending explicit cost
 approval; the previously published APK remains 0.1.0.
 
 ### 0.1.1 — reimbursement entry on mobile keyboards
@@ -170,3 +170,12 @@ Legacy backups receive the new default during restore. New backups mark the
 default-category migration so a renamed Ausgehen category stays renamed on
 restore. Server exports retain the same migration marker when the source
 database already knows this default, including a renamed category alias.
+
+
+### 0.3.1 — date field fits the editor
+
+The server/iPhone form bounds date and month controls to their available width,
+including native Safari rendering, so they cannot stretch the editor sideways.
+The native Android date field already uses the dialog width; it is now explicitly
+single-line with date input. Dates, stored records and backups are unchanged.
+The APK build and physical-device acceptance remain pending.

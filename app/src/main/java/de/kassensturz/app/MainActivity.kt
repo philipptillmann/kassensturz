@@ -251,7 +251,10 @@ class MainActivity : Activity() {
     private inner class Editor(val original: Entry?, draft: Bundle? = null) {
         val base=form()
         val type=select(base,"Art",listOf("Ausgabe","Erstattung / Beitrag","Einnahme"),draft?.getString("type") ?: if(original?.kind=="income")"Einnahme" else if((original?.amount ?: 1)<0)"Erstattung / Beitrag" else "Ausgabe")
-        val date=field(base,"Datum (JJJJ-MM-TT)",draft?.getString("date") ?: original?.date ?: LocalDate.now().toString())
+        val date=field(base,"Datum (JJJJ-MM-TT)",draft?.getString("date") ?: original?.date ?: LocalDate.now().toString()).apply {
+            inputType=InputType.TYPE_CLASS_DATETIME or InputType.TYPE_DATETIME_VARIATION_DATE
+            setSingleLine(true)
+        }
         val merchant=field(base,"Bezeichnung",draft?.getString("merchant") ?: original?.merchant ?: "")
         val amount=field(base,"Betrag in Euro (positiv)",draft?.getString("amount") ?: original?.let { amountText(kotlin.math.abs(it.amount)) } ?: "",true)
         val category=select(base,"Kategorie",data.categories,draft?.getString("category") ?: original?.category ?: "Unkategorisiert")
