@@ -140,10 +140,10 @@ This process does not use an Actions job or automatically mark tests as passed.
 
 ## Shared release version
 
-The current Docker/server and Android release name is **0.5.0**. Both branches
+The current Docker/server and Android release name is **0.6.0**. Both branches
 carry the same root `VERSION` file. Android Gradle reads it for `versionName`;
 the installed app displays its package version. `versionCode` is Android's
-internal upgrade counter and remains separate. The 0.5.0 source uses versionCode 7. Its APK build is pending explicit cost
+internal upgrade counter and remains separate. The 0.6.0 source uses versionCode 8. Its APK build is pending explicit cost
 approval; the previously published APK remains 0.1.0.
 
 ### 0.1.1 — reimbursement entry on mobile keyboards
@@ -212,3 +212,15 @@ branch. For server-side operation and limits, see the
 The common portable format supports a one-time data copy, not synchronization;
 server-specific category aliases cannot be reconstructed from an Android-only
 backup that has never stored them.
+
+
+### Server-only iPhone Shortcut API (0.6.0)
+
+Issue #64 adds a remote expense API to the separate server application, following
+Friss's one-step timestamp/original_message/ai envelope. See the
+[server Shortcut guide](https://github.com/philipptillmann/kassensturz/blob/server/docs/AI_SHORTCUT.md).
+The standalone app keeps local storage and has no network server or API keys.
+Its code is unchanged; VERSION/versionCode align to 0.6.0/8 for future builds.
+No new APK has been built. Android backup round trips preserve common financial
+entries and import keys, but do not preserve the server-only raw Shortcut source
+or deleted-request history.
