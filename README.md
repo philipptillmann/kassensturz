@@ -255,3 +255,22 @@ restart and is separate per dataset/user; it is one level, with no redo. Reverti
 also removes associated transfer links, leaving their other entries intact.
 Only imports made from this release onward can be undone. Restoring a full backup
 clears undo history; undo history is not exported in backups.
+
+### ING CSV (0.9.0)
+
+The supplied ING Umsatzanzeige layout is recognized by its exact 10-column
+booking header, with or without an account-information preamble (not imported).
+Select the actual ING payment account. Booking date (not value date), signed EUR
+amount and counterparty name are mapped automatically; booking text, purpose and
+reference are retained as notes. Balance is never treated as a transaction. Both
+currency columns must be EUR. Explicit positive Gehalt/Rente credits are income;
+other credits remain refunds until manually classified. Zero amounts are listed
+as exclusions. Invalid dates, amounts, currency or row widths abort the import.
+
+This variant has no unique transaction ID. Repeat detection uses the account,
+booking/value dates, name, type, purpose, reference, signed amount and occurrence
+number. Balance and preamble changes do not affect matching. Identical repeated
+rows are retained, but partial exports containing only some indistinguishable
+transactions cannot be resolved uniquely: review the duplicate preview. Existing
+generic CSV imports use different keys; review overlapping date ranges manually.
+The last-import undo also applies to ING. Only synthetic fixtures are committed.

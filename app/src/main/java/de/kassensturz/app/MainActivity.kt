@@ -179,7 +179,7 @@ class MainActivity : Activity() {
         label(b,"${r.date} · ${r.category}${if(r.grouped) " · Gruppe" else ""}   ${money(r.amount)}",14f,color=if(r.amount<0)green else muted)
         b.setPadding(0,dp(6),0,dp(6));b.setOnClickListener {
             if(r.ids.size==1 && !r.grouped) data.entries.find { it.id==r.ids.first() }?.let { edit(it) }
-            else { val entries=r.ids.mapNotNull { id->data.entries.find { it.id==id } };AlertDialog.Builder(this).setTitle(r.name).setItems(entries.map { "${it.date} · ${it.merchant} · ${money(it.amount)}" }.toTypedArray()) { _,i->edit(entries[i]) }.setNegativeButton("Schließen",null).show() }
+            else { val entries=r.ids.mapNotNull { id->data.entries.find { it.id==id } };AlertDialog.Builder(this).setTitle(r.name).setItems(entries.map { "${it.date} · ${it.merchant}${if(it.kind=="income") " (Einnahme)" else ""} · ${money(it.amount)}" }.toTypedArray()) { _,i->edit(entries[i]) }.setNegativeButton("Schließen",null).show() }
         }
     }
     private fun transactions() {
@@ -394,25 +394,32 @@ class MainActivity : Activity() {
         val cat=select(f,"Kategorie für importierte Buchungen",data.categories,"Unkategorisiert")
         val signs=check(f,"Bank-Vorzeichen: Abbuchungen negativ",true)
         val income=check(f,"Alle Gutschriften als Einnahmen (statt Erstattungen)",false)
-        label(f,"Erste Zeile muss Spaltennamen enthalten. Im nächsten Schritt Spalten zuordnen und Vorschau prüfen.",14f,color=muted)
+        label(f,"ING-Vorspann wird automatisch erkannt; sonst muss die erste Zeile Spaltennamen enthalten. Im nächsten Schritt Spalten zuordnen und Vorschau prüfen.",14f,color=muted)
         dialog("Bank-CSV",f,"Spalten zuordnen") {
             val rows=BankCsv.parse(text,when(delimiter.selectedItemPosition){1->',';2->'\t';else->';'})
             require(rows.size>1) { "Keine CSV-Daten gefunden." };require(account.text.isNotBlank()) { "Konto fehlt." }
-            val tr=BankCsv.isTradeRepublic(rows)
-            val mapping=form();if(tr) label(mapping,"Trade Republic erkannt. Spalten und Vorzeichen werden automatisch zugeordnet. Nur Karten und Überweisungen; weitere Arten werden ausdrücklich ausgeschlossen.",14f,color=muted)
+            val tr=BankCsv.isTradeRepublic(rows);val ing=BankCsv.isIng(rows)
+            val mapping=form();if(ing) label(mapping,"ING erkannt. Spalten und EUR-Vorzeichen automatisch; Verwendungszweck/Referenz als Notizen. Gehalt/Rente als Einnahme. Andere Gutschriften anschließend prüfen. Keine eindeutige ID: Teilimporte identischer Buchungen manuell prüfen.",14f,color=muted)
+            if(tr) label(mapping,"Trade Republic erkannt. Spalten und Vorzeichen werden automatisch zugeordnet. Nur Karten und Überweisungen; weitere Arten werden ausdrücklich ausgeschlossen.",14f,color=muted)
             val headers=rows.first().mapIndexed { i,h->"${i+1}: $h" }
             fun guess(vararg words:String)=headers.firstOrNull { h->words.any { h.contains(it,true) } }
             val date=select(mapping,"Buchungsdatum",headers,guess("Buchungstag","Datum","Date"))
             val merchant=select(mapping,"Bezeichnung / Verwendungszweck",headers,guess("Verwendungszweck","Buchungstext","Beschreibung","Merchant"))
             val amount=select(mapping,"Betrag",headers,guess("Betrag","Amount"))
             val iban=select(mapping,"Gegenkonto-IBAN (optional)",listOf("Keine")+headers)
-            if(tr) listOf(date,merchant,amount,iban).forEach { it.isEnabled=false }
+            if(tr || ing) {
+                date.setSelection(rows.first().indexOf(if(ing) "Buchung" else "date"))
+                merchant.setSelection(rows.first().indexOf(if(ing) "Auftraggeber/Empfänger" else "name"))
+                amount.setSelection(rows.first().indexOf(if(ing) "Betrag" else "amount"))
+                iban.setSelection(if(ing) 0 else rows.first().indexOf("counterparty_iban")+1)
+                listOf(date,merchant,amount,iban).forEach { it.isEnabled=false }
+            }
             dialog("Spalten zuordnen",mapping,"Vorschau") {
-                val provider=if(tr) BankCsv.tradeRepublic(rows,account.text.toString(),cat.selectedItem.toString()) else null
+                val provider=if(ing) BankCsv.ing(rows,account.text.toString(),cat.selectedItem.toString()) else if(tr) BankCsv.tradeRepublic(rows,account.text.toString(),cat.selectedItem.toString()) else null
                 val entries=provider?.entries ?: BankCsv.entries(rows,date.selectedItemPosition,merchant.selectedItemPosition,amount.selectedItemPosition,account.text.toString(),cat.selectedItem.toString(),signs.isChecked,iban.selectedItemPosition-1,income.isChecked)
                 require(entries.isNotEmpty()) { "Keine unterstützten Buchungen mit Betrag gefunden.\n"+provider?.excluded.orEmpty().joinToString("\n") }
                 work({store.previewImport(entries)}) { counts ->
-                    confirm("${counts.first} neue Buchungen importieren?", (provider?.excluded?.takeIf { it.isNotEmpty() }?.let { "${it.size} ausgeschlossene Zeilen:\n"+it.joinToString("\n")+"\n\n" } ?: "")+"${counts.second} bereits vorhandene werden übersprungen.\n\n"+entries.take(8).joinToString("\n") { "${it.date} · ${it.merchant} · ${money(it.amount)}" }+"\n\nDie Prüfung wird beim Speichern wiederholt. Gutschriften können anschließend als Einnahme oder Erstattung bearbeitet werden.") {
+                    confirm("${counts.first} neue Buchungen importieren?", (provider?.excluded?.takeIf { it.isNotEmpty() }?.let { "${it.size} ausgeschlossene Zeilen:\n"+it.joinToString("\n")+"\n\n" } ?: "")+"${counts.second} bereits vorhandene werden übersprungen.\n\n"+entries.take(8).joinToString("\n") { "${it.date} · ${it.merchant}${if(it.kind=="income") " (Einnahme)" else ""} · ${money(it.amount)}" }+"\n\nDie Prüfung wird beim Speichern wiederholt. Gutschriften können anschließend als Einnahme oder Erstattung bearbeitet werden.") {
                         work({val actual=store.importEntries(entries);actual to store.snapshot()}) { (actual,snapshot)->data=snapshot;screen();toast("${actual.first} importiert, ${actual.second} bereits vorhanden.") }
                     }
                 }

@@ -22,7 +22,9 @@ object BankCsv {
         }
         require(!quoted) { "Nicht geschlossene CSV-Anführungszeichen." }
         if(field.isNotEmpty() || row.isNotEmpty()) { row.add(field.toString()); if(row.any { it.isNotBlank() }) rows.add(row) }
-        return rows.mapIndexed { index, columns -> if(index==0) columns.map { it.removePrefix("\uFEFF") } else columns }
+        val cleaned=rows.mapIndexed { index, columns -> if(index==0) columns.map { it.removePrefix("\uFEFF") } else columns }
+        val start=cleaned.indexOfFirst { it==ingHeader }
+        return if(start>=0) listOf(ingColumns)+cleaned.drop(start+1) else cleaned
     }
     fun amount(raw: String): Long {
         var s=raw.trim().replace("€", "").replace("EUR", "",true).replace("\u00a0", "").replace(" ", "")
@@ -56,11 +58,37 @@ object BankCsv {
             } catch(e: IllegalArgumentException) { throw IllegalArgumentException("Zeile ${index+2}: ${e.message}") }
         }
     }
+    private val ingHeader=listOf("Buchung","Wertstellungsdatum","Auftraggeber/Empfänger","Buchungstext","Verwendungszweck","Referenz","Saldo","Währung","Betrag","Währung")
+    private val ingColumns=ingHeader.dropLast(1)+"Betragswährung"
+    fun isIng(rows: List<List<String>>) = rows.firstOrNull()==ingColumns
+    fun ing(rows: List<List<String>>, account:String, category:String): ProviderImport {
+        require(isIng(rows) && account.isNotBlank()) { "ING: Konto oder Spalten fehlen." }
+        val entries=mutableListOf<Entry>();val excluded=mutableListOf<String>();val occurrences=mutableMapOf<String,Int>()
+        rows.drop(1).forEachIndexed { index,row ->
+            require(row.size==ingColumns.size) { "ING-Buchungszeile ${index+2}: Spalten fehlen." }
+            try {
+                val r=ingColumns.zip(row).toMap()
+                fun cell(name:String)=r.getValue(name).trim()
+                require(cell("Währung")=="EUR" && cell("Betragswährung")=="EUR") { "ING: Nur EUR wird unterstützt." }
+                val day=date(cell("Buchung"));val valueDay=date(cell("Wertstellungsdatum"));val value= -amount(cell("Betrag"))
+                if(value==0L) excluded.add("Buchungszeile ${index+2}: Nullbetrag")
+                else {
+                    val merchant=cell("Auftraggeber/Empfänger").ifEmpty { cell("Verwendungszweck") }.ifEmpty { cell("Buchungstext") }
+                    val notes=listOf("Buchungstext","Verwendungszweck","Referenz").map { cell(it) }.filter { it.isNotEmpty() }.joinToString("\n")
+                    val base=listOf("ing",account.trim(),day,valueDay,merchant,cell("Buchungstext"),cell("Verwendungszweck"),cell("Referenz"),value.toString(),"EUR").joinToString("\u0000")
+                    val nth=occurrences.getOrDefault(base,0)+1;occurrences[base]=nth
+                    val key=MessageDigest.getInstance("SHA-256").digest((base+"\u0000"+nth).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+                    entries.add(Entry(date=day,merchant=merchant,amount=value,category=category,payment=account.trim(),kind=if(value<0 && cell("Buchungstext")=="Gehalt/Rente") "income" else "expense",notes=notes,importKey="ing:$key").also { Ledger.validate(it) })
+                }
+            } catch(e: IllegalArgumentException) { throw IllegalArgumentException("ING-Buchungszeile ${index+2}: ${e.message}") }
+        }
+        return ProviderImport(entries,excluded)
+    }
     private val trHeaders=setOf("datetime","date","account_type","category","type","name","amount","currency","transaction_id","counterparty_iban","description","asset_class")
     private val trTypes=setOf("CARD_TRANSACTION","TRANSFER_INSTANT_OUTBOUND","TRANSFER_INSTANT_INBOUND","TRANSFER_OUTBOUND","TRANSFER_INBOUND")
     fun isTradeRepublic(rows: List<List<String>>) = rows.isNotEmpty() && rows.first().containsAll(trHeaders)
-    data class TradeRepublicImport(val entries: List<Entry>, val excluded: List<String>)
-    fun tradeRepublic(rows: List<List<String>>, account: String, category: String): TradeRepublicImport {
+    data class ProviderImport(val entries: List<Entry>, val excluded: List<String>)
+    fun tradeRepublic(rows: List<List<String>>, account: String, category: String): ProviderImport {
         require(isTradeRepublic(rows) && account.isNotBlank()) { "Trade Republic: Konto oder Spalten fehlen." }
         val entries=mutableListOf<Entry>();val excluded=mutableListOf<String>()
         rows.drop(1).forEachIndexed { index,row ->
@@ -85,7 +113,7 @@ object BankCsv {
                 } catch(e: IllegalArgumentException) { throw IllegalArgumentException("Zeile ${index+2}: ${e.message}") }
             }
         }
-        return TradeRepublicImport(entries,excluded)
+        return ProviderImport(entries,excluded)
     }
     fun export(entries: List<Entry>): String {
         fun cell(value: String) = "\""+value.replace("\"","\"\"")+"\""

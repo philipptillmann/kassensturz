@@ -4,6 +4,32 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class BankCsvTest {
+    private fun ingFixture(vararg lines:String) = "\uFEFFUmsatzanzeige;Synthetic fixture only;;;;;;;;\r\nIBAN;DE00000000000000000000;;;;;;;;\r\n;;;;;;;;;\r\nBuchung;Wertstellungsdatum;Auftraggeber/Empfänger;Buchungstext;Verwendungszweck;Referenz;Saldo;Währung;Betrag;Währung\r\n"+lines.joinToString("\r\n")
+    @Test fun ingPreambleCurrenciesNotesAndSharedIdentity() {
+        val row="30.09.2026;29.09.2026;Example shop;Lastschrift;Example purpose;;9.876,54;EUR;-10,50;EUR"
+        val rows=BankCsv.parse(ingFixture(row),';')
+        assertTrue(BankCsv.isIng(rows));assertEquals(2,rows.size)
+        val entry=BankCsv.ing(rows,"Bar","Unkategorisiert").entries.single()
+        assertEquals("2026-09-30",entry.date);assertEquals(1050L,entry.amount)
+        assertEquals("Lastschrift\nExample purpose",entry.notes)
+        assertEquals("ing:5b433d3a38b0b5e0b794b7024ba9da27198b3f53e7419b94412a3982a1cbd172",entry.importKey)
+        val duplicate=BankCsv.ing(BankCsv.parse(ingFixture(row,row),';'),"Bar","Unkategorisiert")
+        assertEquals(2,duplicate.entries.size);assertNotEquals(duplicate.entries[0].importKey,duplicate.entries[1].importKey)
+        assertEquals(entry.importKey,BankCsv.ing(BankCsv.parse(ingFixture(row.replace("9.876,54","1,00")),';'),"Bar","Unkategorisiert").entries.single().importKey)
+        assertNotEquals(entry.importKey,BankCsv.ing(rows,"PayPal","Unkategorisiert").entries.single().importKey)
+    }
+    @Test fun ingSalaryRefundZeroAndInvalidFields() {
+        val row="30.09.2026;29.09.2026;Example shop;Lastschrift;Example purpose;;9.876,54;EUR;-10,50;EUR"
+        val salary=row.replace("Lastschrift","Gehalt/Rente").replace("-10,50","1234")
+        val refund=row.replace("Lastschrift","Gutschrift").replace("-10,50","25")
+        val result=BankCsv.ing(BankCsv.parse(ingFixture(salary,refund,row.replace("-10,50","0")),';'),"Bar","Unkategorisiert")
+        assertEquals(listOf("income","expense"),result.entries.map { it.kind });assertEquals(1,result.excluded.size)
+        for(invalid in listOf(row.replace("EUR","USD"),row.replace("30.09.2026","31.02.2026"),row.replace("-10,50","1,234"),row.substringBeforeLast(';'))) {
+            assertThrows(IllegalArgumentException::class.java) { BankCsv.ing(BankCsv.parse(ingFixture(row,invalid),';'),"Bar","Unkategorisiert") }
+        }
+        val quoted=row.replace("Example purpose","\"Quoted; purpose\nsecond line\"")
+        assertTrue(BankCsv.ing(BankCsv.parse(ingFixture(quoted),';'),"Bar","Unkategorisiert").entries.single().notes.contains("Quoted; purpose\nsecond line"))
+    }
     @Test fun tradeRepublicBookingDateIdentityAndExclusions() {
         val h="datetime;date;account_type;category;type;asset_class;name;amount;currency;transaction_id;counterparty_iban;description".split(';')
         val card=listOf("2026-09-30T23:30:00Z","2026-10-01","DEFAULT","CASH","CARD_TRANSACTION","","Synthetic shop","-12.34","EUR","fixture-1","","")
