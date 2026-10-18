@@ -74,6 +74,11 @@ ING_COLUMNS = ING_HEADER[:-1] + ['Betragswährung']
 def ing_format(headers):
     return headers == ING_COLUMNS
 
+VOLKSBANK_HEADER = ['Bezeichnung Auftragskonto', 'IBAN Auftragskonto', 'BIC Auftragskonto', 'Bankname Auftragskonto', 'Buchungstag', 'Valutadatum', 'Name Zahlungsbeteiligter', 'IBAN Zahlungsbeteiligter', 'BIC (SWIFT-Code) Zahlungsbeteiligter', 'Buchungstext', 'Verwendungszweck', 'Betrag', 'Waehrung', 'Saldo nach Buchung', 'Bemerkung', 'Gekennzeichneter Umsatz', 'Glaeubiger ID', 'Mandatsreferenz']
+
+def volksbank_format(headers):
+    return headers == VOLKSBANK_HEADER
+
 def read_csv(text):
     # Parse records, not physical lines: quoted notes may contain newlines.
     try:
@@ -81,11 +86,12 @@ def read_csv(text):
     except csv.Error:
         records = []  # A different delimiter may follow a quoted field.
     for start, header in enumerate(records):
-        if header == ING_HEADER:
+        if header == ING_HEADER or header == VOLKSBANK_HEADER:
+            columns = ING_COLUMNS if header == ING_HEADER else VOLKSBANK_HEADER
             data = [row for row in records[start+1:] if any(cell.strip() for cell in row)]
             if not data: raise ValueError('CSV enthält keine Buchungen.')
-            if any(len(row) != len(ING_COLUMNS) for row in data): raise ValueError('ING: Unerwartete Spaltenanzahl.')
-            return ING_COLUMNS[:], [dict(zip(ING_COLUMNS, row)) for row in data]
+            if any(len(row) != len(columns) for row in data): raise ValueError('Bank-CSV: Unerwartete Spaltenanzahl.')
+            return columns[:], [dict(zip(columns, row)) for row in data]
     try: dialect = csv.Sniffer().sniff(text[:8000], delimiters=';,\t')
     except csv.Error: raise ValueError('CSV-Trennzeichen nicht erkannt.')
     reader = csv.DictReader(io.StringIO(text.lstrip('\ufeff')), dialect=dialect)
@@ -230,15 +236,59 @@ def ing_rows(rows, payment):
             raise ValueError(f'ING-Buchungszeile {index}: {e}')
     return prepared, excluded
 
+def volksbank_accounts(rows):
+    accounts = sorted({re.sub(r'\s+', '', row['IBAN Auftragskonto']).upper() for row in rows})
+    if not accounts or any(not value or len(value)>34 for value in accounts):
+        raise ValueError('Volksbank: IBAN Auftragskonto fehlt oder ist zu lang.')
+    return accounts
+
+def volksbank_rows(rows, payment, source=''):
+    if not isinstance(payment, str) or not payment: raise ValueError('Für Volksbank bitte ein Zahlungsmittel auswählen.')
+    accounts = volksbank_accounts(rows)
+    if not isinstance(source, str): raise ValueError('Volksbank: Quellkonto auswählen.')
+    source = re.sub(r'\s+', '', source).upper() or (accounts[0] if len(accounts)==1 else '')
+    if source not in accounts: raise ValueError('Volksbank: Genau ein Quellkonto aus der CSV auswählen.')
+    prepared, excluded, occurrences = [], [], {}
+    for index, row in enumerate(rows, 2):
+        try:
+            own = re.sub(r'\s+', '', row['IBAN Auftragskonto']).upper()
+            if own != source:
+                excluded.append({'line': index, 'type': 'Anderes Quellkonto', 'reason': 'Nicht ausgewähltes Konto'})
+                continue
+            if row['Waehrung'].strip() != 'EUR': raise ValueError('Nur EUR wird unterstützt')
+            day, value_day = date_value(row['Buchungstag']), date_value(row['Valutadatum'])
+            value = -cents(row['Betrag'])
+            if abs(value)>99999999999: raise ValueError('Betrag zu groß')
+            if not value:
+                excluded.append({'line': index, 'type': row['Buchungstext'], 'reason': 'Nullbetrag'})
+                continue
+            merchant = row['Name Zahlungsbeteiligter'].strip() or row['Verwendungszweck'].strip() or row['Buchungstext'].strip()
+            if not merchant or len(merchant)>200: raise ValueError('Bezeichnung muss 1–200 Zeichen enthalten')
+            iban = re.sub(r'\s+', '', row['IBAN Zahlungsbeteiligter']).upper()
+            if len(iban)>34: raise ValueError('Gegenkonto zu lang')
+            notes = '\n'.join(row[field].strip() for field in ('Buchungstext','Verwendungszweck','Bemerkung','Glaeubiger ID','Mandatsreferenz') if row[field].strip())
+            if len(notes)>10000: raise ValueError('Notizen zu lang')
+            base = '\0'.join(['volksbank', payment, own, day, value_day, merchant, iban, row['Buchungstext'].strip(), row['Verwendungszweck'].strip(), row['Glaeubiger ID'].strip(), row['Mandatsreferenz'].strip(), str(value), 'EUR'])
+            occurrences[base] = occurrences.get(base, 0) + 1
+            key = 'vb:' + hashlib.sha256((base+'\0'+str(occurrences[base])).encode()).hexdigest()
+            prepared.append((day, merchant, value, 'Unkategorisiert', key, '', iban, 'expense', notes))
+        except (ValueError, KeyError, TypeError) as e:
+            raise ValueError(f'Volksbank-Zeile {index}: {e}')
+    return prepared, excluded
+
 def csv_excluded(d):
     headers, rows = read_csv(d['text'])
+    if volksbank_format(headers): return volksbank_rows(rows, d.get('payment_method', ''), d.get('source_account', ''))[1]
     if ing_format(headers): return ing_rows(rows, d.get('payment_method', ''))[1]
     return tr_rows(rows, d.get('payment_method', ''))[1] if trade_republic(headers) else []
 
 def _csv_plan(d, c):
     headers, rows = read_csv(d['text'])
     prepared, occurrences = [], {}
-    if ing_format(headers):
+    if volksbank_format(headers):
+        prepared, _ = volksbank_rows(rows, d.get('payment_method', ''), d.get('source_account', ''))
+        rows = []
+    elif ing_format(headers):
         prepared, _ = ing_rows(rows, d.get('payment_method', ''))
         rows = []
     elif trade_republic(headers):

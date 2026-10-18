@@ -566,3 +566,22 @@ rows are retained, but partial exports containing only some indistinguishable
 transactions cannot be resolved uniquely: review the duplicate preview. Existing
 generic CSV imports use different keys; review overlapping date ranges manually.
 The last-import undo also applies to ING. Only synthetic fixtures are committed.
+
+### Volksbank CSV (0.10.0)
+
+The supplied 18-column semicolon format is detected automatically. Choose the
+source IBAN from the file and the matching payment account in Kassensturz. Each
+import covers one source account; other source accounts are explicitly excluded
+in preview. Import them separately into their own payment accounts. Booking day
+and signed EUR amount are mapped; value date and balance do not replace these.
+Counterparty IBAN is retained for transfer reconciliation. Booking text, purpose,
+remark, creditor ID and mandate reference are saved as notes. Credits remain
+refunds until manually classified as income; the sample has no salary marker.
+
+No unique booking ID is supplied. Deduplication includes source IBAN, selected
+payment account, booking/value dates, party/IBAN, booking text/purpose, creditor ID,
+mandate, signed cents and occurrence number. Balance/flags/remarks do not change
+identity. Indistinguishable partial exports need manual review; older generic CSV
+imports use different keys. Preview and last-import undo apply normally. EUR only;
+invalid selected-account rows abort atomically, zeros are explicitly excluded.
+Only synthetic fixtures are committed; the supplied CSV is kept out of GitHub.

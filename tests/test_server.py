@@ -154,6 +154,19 @@ class ServerTests(unittest.TestCase):
         self.login(restarted)
         self.assertEqual(restarted.get('/api/data').json['transactions'][0]['amount'], 450)
 
+    def test_volksbank_source_selection_and_undo_api(self):
+        from test_volksbank import sample,booking,SOURCE,OTHER
+        csrf=self.login();data={'text':sample(booking(),booking(source=OTHER)),'payment_method':'Bar'}
+        preview=self.post('/api/import-preview',data,csrf).json
+        self.assertEqual(preview['provider'],'volksbank');self.assertEqual(preview['source_accounts'],[SOURCE,OTHER])
+        self.assertEqual(self.post('/api/import',data,csrf).status_code,400)
+        data['source_account']=SOURCE
+        checked=self.post('/api/import-check',data,csrf).json
+        self.assertEqual((checked['added'],len(checked['excluded'])),(1,1))
+        self.assertEqual(self.post('/api/import',data,csrf).json['added'],1)
+        token=self.post('/api/import-undo-preview',{},csrf).json['token']
+        self.assertEqual(self.post('/api/import-undo',{'token':token},csrf).json,{'removed':1})
+
     def test_ing_auto_detection_and_salary_import_with_undo(self):
         from test_ing import sample,payment
         csrf=self.login()
