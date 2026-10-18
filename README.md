@@ -224,3 +224,22 @@ Its code is unchanged; VERSION/versionCode align to 0.6.0/8 for future builds.
 No new APK has been built. Android backup round trips preserve common financial
 entries and import keys, but do not preserve the server-only raw Shortcut source
 or deleted-request history.
+
+### Trade Republic CSV (0.7.0)
+
+Semicolon exports with `datetime;date;account_type;category;type;…;transaction_id`
+are detected automatically. Select the actual Trade Republic payment account.
+Booking `date` and signed EUR `amount` are used; original-currency fields are not
+converted again. Supported cash types: CARD_TRANSACTION, TRANSFER_INSTANT_OUTBOUND,
+TRANSFER_INSTANT_INBOUND, TRANSFER_OUTBOUND, TRANSFER_INBOUND. Card credits remain
+refunds; transfers remain uncategorized expenses/refunds until classified or matched
+as internal transfers. Investment, Saveback, interest, tax and unknown types are
+explicitly excluded in the preview, rather than guessed from incomplete semantics.
+Review exclusions before importing. Interest/tax support and other bank formats
+remain follow-up work under #7.
+
+Repeat detection uses provider, selected account, account_type and transaction_id.
+Keep the same payment account name on repeat imports. Older generic CSV imports
+have different keys: do not reimport their date ranges without checking/removing
+existing entries. No fuzzy deduplication against manually entered records occurs.
+The supplied personal CSV is not included in the repository.

@@ -56,6 +56,37 @@ object BankCsv {
             } catch(e: IllegalArgumentException) { throw IllegalArgumentException("Zeile ${index+2}: ${e.message}") }
         }
     }
+    private val trHeaders=setOf("datetime","date","account_type","category","type","name","amount","currency","transaction_id","counterparty_iban","description","asset_class")
+    private val trTypes=setOf("CARD_TRANSACTION","TRANSFER_INSTANT_OUTBOUND","TRANSFER_INSTANT_INBOUND","TRANSFER_OUTBOUND","TRANSFER_INBOUND")
+    fun isTradeRepublic(rows: List<List<String>>) = rows.isNotEmpty() && rows.first().containsAll(trHeaders)
+    data class TradeRepublicImport(val entries: List<Entry>, val excluded: List<String>)
+    fun tradeRepublic(rows: List<List<String>>, account: String, category: String): TradeRepublicImport {
+        require(isTradeRepublic(rows) && account.isNotBlank()) { "Trade Republic: Konto oder Spalten fehlen." }
+        val entries=mutableListOf<Entry>();val excluded=mutableListOf<String>()
+        rows.drop(1).forEachIndexed { index,row ->
+            require(row.size==rows.first().size) { "Zeile ${index+2}: Spalten fehlen." }
+            val r=rows.first().zip(row).toMap()
+            fun cell(name:String)=r.getValue(name)
+            val type=cell("type")
+            if(cell("category")!="CASH" || type !in trTypes || cell("asset_class").isNotBlank()) {
+                excluded.add("Zeile ${index+2}: $type (Nicht unterstützte Buchungsart / Anlagebuchung)")
+            } else {
+                try {
+                    require(cell("currency")=="EUR") { "Nur EUR wird unterstützt." }
+                    require(cell("transaction_id").isNotBlank()) { "Transaktions-ID fehlt." }
+                    val value=amount(cell("amount"))
+                    if(value==0L) excluded.add("Zeile ${index+2}: $type (Nullbetrag)")
+                    else {
+                        val merchant=cell("name").trim().ifEmpty { r["counterparty_name"].orEmpty().trim() }.ifEmpty { cell("description").trim() }
+                        val base=listOf("trade-republic",account.trim(),cell("account_type").trim(),cell("transaction_id").trim()).joinToString("\u0000")
+                        val key=MessageDigest.getInstance("SHA-256").digest(base.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+                        entries.add(Entry(date=date(cell("date")),merchant=merchant,amount=-value,category=category,payment=account.trim(),kind="expense",counterparty=cell("counterparty_iban").replace(Regex("\\s+"),"").uppercase(java.util.Locale.ROOT),importKey="tr:$key").also { Ledger.validate(it) })
+                    }
+                } catch(e: IllegalArgumentException) { throw IllegalArgumentException("Zeile ${index+2}: ${e.message}") }
+            }
+        }
+        return TradeRepublicImport(entries,excluded)
+    }
     fun export(entries: List<Entry>): String {
         fun cell(value: String) = "\""+value.replace("\"","\"\"")+"\""
         val header=listOf("Datum","Bezeichnung","Betrag","Kategorie","Zahlungsmittel","Art","Gruppe","Notizen","Position","Positionsbetrag","Positionskategorie","Positionsgruppe")

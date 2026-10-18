@@ -390,17 +390,21 @@ class MainActivity : Activity() {
         dialog("Bank-CSV",f,"Spalten zuordnen") {
             val rows=BankCsv.parse(text,when(delimiter.selectedItemPosition){1->',';2->'\t';else->';'})
             require(rows.size>1) { "Keine CSV-Daten gefunden." };require(account.text.isNotBlank()) { "Konto fehlt." }
-            val mapping=form();val headers=rows.first().mapIndexed { i,h->"${i+1}: $h" }
+            val tr=BankCsv.isTradeRepublic(rows)
+            val mapping=form();if(tr) label(mapping,"Trade Republic erkannt. Spalten und Vorzeichen werden automatisch zugeordnet. Nur Karten und Überweisungen; weitere Arten werden ausdrücklich ausgeschlossen.",14f,color=muted)
+            val headers=rows.first().mapIndexed { i,h->"${i+1}: $h" }
             fun guess(vararg words:String)=headers.firstOrNull { h->words.any { h.contains(it,true) } }
             val date=select(mapping,"Buchungsdatum",headers,guess("Buchungstag","Datum","Date"))
             val merchant=select(mapping,"Bezeichnung / Verwendungszweck",headers,guess("Verwendungszweck","Buchungstext","Beschreibung","Merchant"))
             val amount=select(mapping,"Betrag",headers,guess("Betrag","Amount"))
             val iban=select(mapping,"Gegenkonto-IBAN (optional)",listOf("Keine")+headers)
+            if(tr) listOf(date,merchant,amount,iban).forEach { it.isEnabled=false }
             dialog("Spalten zuordnen",mapping,"Vorschau") {
-                val entries=BankCsv.entries(rows,date.selectedItemPosition,merchant.selectedItemPosition,amount.selectedItemPosition,account.text.toString(),cat.selectedItem.toString(),signs.isChecked,iban.selectedItemPosition-1,income.isChecked)
-                require(entries.isNotEmpty()) { "Keine Buchungen mit Betrag gefunden." }
+                val provider=if(tr) BankCsv.tradeRepublic(rows,account.text.toString(),cat.selectedItem.toString()) else null
+                val entries=provider?.entries ?: BankCsv.entries(rows,date.selectedItemPosition,merchant.selectedItemPosition,amount.selectedItemPosition,account.text.toString(),cat.selectedItem.toString(),signs.isChecked,iban.selectedItemPosition-1,income.isChecked)
+                require(entries.isNotEmpty()) { "Keine unterstützten Buchungen mit Betrag gefunden.\n"+provider?.excluded.orEmpty().joinToString("\n") }
                 work({store.previewImport(entries)}) { counts ->
-                    confirm("${counts.first} neue Buchungen importieren?", "${counts.second} bereits vorhandene werden übersprungen.\n\n"+entries.take(8).joinToString("\n") { "${it.date} · ${it.merchant} · ${money(it.amount)}" }+"\n\nDie Prüfung wird beim Speichern wiederholt. Gutschriften können anschließend als Einnahme oder Erstattung bearbeitet werden.") {
+                    confirm("${counts.first} neue Buchungen importieren?", (provider?.excluded?.takeIf { it.isNotEmpty() }?.let { "${it.size} ausgeschlossene Zeilen:\n"+it.joinToString("\n")+"\n\n" } ?: "")+"${counts.second} bereits vorhandene werden übersprungen.\n\n"+entries.take(8).joinToString("\n") { "${it.date} · ${it.merchant} · ${money(it.amount)}" }+"\n\nDie Prüfung wird beim Speichern wiederholt. Gutschriften können anschließend als Einnahme oder Erstattung bearbeitet werden.") {
                         work({val actual=store.importEntries(entries);actual to store.snapshot()}) { (actual,snapshot)->data=snapshot;screen();toast("${actual.first} importiert, ${actual.second} bereits vorhanden.") }
                     }
                 }
