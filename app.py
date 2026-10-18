@@ -68,7 +68,24 @@ def date_value(s):
         except ValueError: pass
     raise ValueError('Datum nicht erkannt: ' + s)
 
+ING_HEADER = ['Buchung','Wertstellungsdatum','Auftraggeber/Empfänger','Buchungstext','Verwendungszweck','Referenz','Saldo','Währung','Betrag','Währung']
+ING_COLUMNS = ING_HEADER[:-1] + ['Betragswährung']
+
+def ing_format(headers):
+    return headers == ING_COLUMNS
+
 def read_csv(text):
+    # Parse records, not physical lines: quoted notes may contain newlines.
+    try:
+        records = list(csv.reader(io.StringIO(text.lstrip('\ufeff')), delimiter=';', strict=True))
+    except csv.Error:
+        records = []  # A different delimiter may follow a quoted field.
+    for start, header in enumerate(records):
+        if header == ING_HEADER:
+            data = [row for row in records[start+1:] if any(cell.strip() for cell in row)]
+            if not data: raise ValueError('CSV enthält keine Buchungen.')
+            if any(len(row) != len(ING_COLUMNS) for row in data): raise ValueError('ING: Unerwartete Spaltenanzahl.')
+            return ING_COLUMNS[:], [dict(zip(ING_COLUMNS, row)) for row in data]
     try: dialect = csv.Sniffer().sniff(text[:8000], delimiters=';,\t')
     except csv.Error: raise ValueError('CSV-Trennzeichen nicht erkannt.')
     reader = csv.DictReader(io.StringIO(text.lstrip('\ufeff')), dialect=dialect)
@@ -182,19 +199,49 @@ def tr_rows(rows, payment):
             if len(iban)>34: raise ValueError('Gegenkonto zu lang')
             base = '\0'.join(['trade-republic', payment, row['account_type'].strip(), row['transaction_id'].strip()])
             key = 'tr:' + hashlib.sha256(base.encode()).hexdigest()
-            result.append((day, merchant, -value, 'Unkategorisiert', key, '', iban))
+            result.append((day, merchant, -value, 'Unkategorisiert', key, '', iban, 'expense', ''))
         except (ValueError, KeyError, TypeError) as e:
             raise ValueError(f'CSV-Zeile {index}: {e}')
     return result, excluded
 
+def ing_rows(rows, payment):
+    if not isinstance(payment, str) or not payment: raise ValueError('Für ING bitte ein Zahlungsmittel auswählen.')
+    prepared, excluded, occurrences = [], [], {}
+    for index, row in enumerate(rows, 2):
+        try:
+            if row['Währung'].strip() != 'EUR' or row['Betragswährung'].strip() != 'EUR':
+                raise ValueError('ING: Nur EUR wird unterstützt')
+            day = date_value(row['Buchung'])
+            value_day = date_value(row['Wertstellungsdatum'])
+            value = -cents(row['Betrag'])
+            if not value:
+                excluded.append({'line': index, 'type': row['Buchungstext'], 'reason': 'Nullbetrag (Zeile ab Buchungskopf)'})
+                continue
+            merchant = row['Auftraggeber/Empfänger'].strip() or row['Verwendungszweck'].strip() or row['Buchungstext'].strip()
+            if not merchant or len(merchant)>200: raise ValueError('Bezeichnung muss 1–200 Zeichen enthalten')
+            kind = 'income' if value < 0 and row['Buchungstext'].strip() == 'Gehalt/Rente' else 'expense'
+            notes = '\n'.join(row[field].strip() for field in ('Buchungstext','Verwendungszweck','Referenz') if row[field].strip())
+            if len(notes)>10000: raise ValueError('Notizen zu lang')
+            base = '\0'.join(['ing', payment, day, value_day, merchant, row['Buchungstext'].strip(), row['Verwendungszweck'].strip(), row['Referenz'].strip(), str(value), 'EUR'])
+            occurrences[base] = occurrences.get(base, 0) + 1
+            key = 'ing:' + hashlib.sha256((base+'\0'+str(occurrences[base])).encode()).hexdigest()
+            prepared.append((day, merchant, value, 'Unkategorisiert', key, '', '', kind, notes))
+        except (ValueError, KeyError, TypeError) as e:
+            raise ValueError(f'ING-Buchungszeile {index}: {e}')
+    return prepared, excluded
+
 def csv_excluded(d):
     headers, rows = read_csv(d['text'])
+    if ing_format(headers): return ing_rows(rows, d.get('payment_method', ''))[1]
     return tr_rows(rows, d.get('payment_method', ''))[1] if trade_republic(headers) else []
 
 def _csv_plan(d, c):
     headers, rows = read_csv(d['text'])
     prepared, occurrences = [], {}
-    if trade_republic(headers):
+    if ing_format(headers):
+        prepared, _ = ing_rows(rows, d.get('payment_method', ''))
+        rows = []
+    elif trade_republic(headers):
         prepared, _ = tr_rows(rows, d.get('payment_method', ''))
         rows = []
     for index, row in enumerate(rows, 2):
@@ -214,7 +261,7 @@ def _csv_plan(d, c):
                 counterpart = re.sub(r'\s+', '', str(row[d['counterparty_column']])).upper()
                 if len(counterpart) > 34:
                     raise ValueError('Gegenkonto ist zu lang')
-            prepared.append((date,merchant,amount,'Unkategorisiert',key,legacy_key,counterpart))
+            prepared.append((date,merchant,amount,'Unkategorisiert',key,legacy_key,counterpart,'expense',''))
         except (ValueError, KeyError, TypeError) as e: raise ValueError(f'CSV-Zeile {index}: {e}')
     payment = d.get('payment_method', '')
     if not isinstance(payment, str) or payment and not c.execute('SELECT 1 FROM payment_methods WHERE name=?', (payment,)).fetchone():
@@ -223,12 +270,12 @@ def _csv_plan(d, c):
     existing = {row['import_key']: row['payment_method'] for row in c.execute('SELECT import_key,payment_method FROM transactions WHERE import_key IS NOT NULL')}
     seen = set(existing)
     plan = []
-    for date,merchant,amount,_,key,legacy_key,counterpart in prepared:
+    for date,merchant,amount,_,key,legacy_key,counterpart,kind,notes in prepared:
         if legacy_key in existing and existing[legacy_key] == payment:
             key = legacy_key
         duplicate = key in seen
         seen.add(key)
-        plan.append({'values': (date,merchant,amount,category,key,payment,counterpart), 'duplicate': duplicate})
+        plan.append({'values': (date,merchant,amount,category,key,payment,counterpart,kind,notes), 'duplicate': duplicate})
     return plan
 
 def preview_import(d, db=None):
@@ -237,7 +284,7 @@ def preview_import(d, db=None):
         plan = _csv_plan(d, c)
     skipped = sum(row['duplicate'] for row in plan)
     return {'added': len(plan)-skipped, 'skipped': skipped, 'excluded': csv_excluded(d), 'rows': [
-        {'date': row['values'][0], 'merchant': row['values'][1], 'amount': row['values'][2], 'duplicate': row['duplicate']}
+        {'date': row['values'][0], 'merchant': row['values'][1], 'amount': row['values'][2], 'kind': row['values'][7], 'duplicate': row['duplicate']}
         for row in plan[:20]]}
 
 def import_csv(d, db=None):
@@ -250,7 +297,7 @@ def import_csv(d, db=None):
             c.execute('DELETE FROM csv_undo_entries')
             c.execute('INSERT OR REPLACE INTO csv_undo VALUES (1,?,?)', (secrets.token_hex(24), datetime.datetime.now(datetime.timezone.utc).isoformat()))
             for values in new:
-                cursor = c.execute('INSERT INTO transactions(date,merchant,amount,category,import_key,payment_method,counterparty_iban) VALUES (?,?,?,?,?,?,?)', values)
+                cursor = c.execute('INSERT INTO transactions(date,merchant,amount,category,import_key,payment_method,counterparty_iban,kind,notes) VALUES (?,?,?,?,?,?,?,?,?)', values)
                 c.execute('INSERT INTO csv_undo_entries VALUES (?)', (cursor.lastrowid,))
     result = {'added': len(new), 'skipped': len(plan)-len(new)}
     excluded = csv_excluded(d)

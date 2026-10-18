@@ -154,6 +154,21 @@ class ServerTests(unittest.TestCase):
         self.login(restarted)
         self.assertEqual(restarted.get('/api/data').json['transactions'][0]['amount'], 450)
 
+    def test_ing_auto_detection_and_salary_import_with_undo(self):
+        from test_ing import sample,payment
+        csrf=self.login()
+        data={'text':sample([payment(),payment(kind='Gehalt/Rente',amount='2500')]),'payment_method':'Bar'}
+        detected=self.post('/api/import-preview',data,csrf)
+        self.assertEqual(detected.status_code,200)
+        self.assertEqual((detected.json['provider'],detected.json['count']),('ing',2))
+        self.assertNotIn('Kunde',detected.json['headers'])
+        preview=self.post('/api/import-check',data,csrf)
+        self.assertEqual([r['kind'] for r in preview.json['rows']],['expense','income'])
+        self.assertEqual(self.post('/api/import',data,csrf).json,{'added':2,'skipped':0})
+        self.assertEqual(self.post('/api/import',data,csrf).json,{'added':0,'skipped':2})
+        token=self.post('/api/import-undo-preview',{},csrf).json['token']
+        self.assertEqual(self.post('/api/import-undo',{'token':token},csrf).json,{'removed':2})
+
     def test_csv_undo_api_is_dataset_scoped_and_consumed_once(self):
         csrf=self.login()
         data={'text':'Date;Name;Amount\n2026-10-01;Synthetic cafe;-5,00\n','date_column':'Date','merchant_column':'Name','amount_column':'Amount'}
