@@ -214,16 +214,15 @@ server-specific category aliases cannot be reconstructed from an Android-only
 backup that has never stored them.
 
 
-### Server-only iPhone Shortcut API (0.6.0)
+### Server-only iPhone Shortcut API (0.11.0)
 
-Issue #64 adds a remote expense API to the separate server application, following
-Friss's one-step timestamp/original_message/ai envelope. See the
-[server Shortcut guide](https://github.com/philipptillmann/kassensturz/blob/server/docs/AI_SHORTCUT.md).
-The standalone app keeps local storage and has no network server or API keys.
-Its code is unchanged; VERSION/versionCode align to 0.6.0/8 for future builds.
-No new APK has been built. Android backup round trips preserve common financial
-entries and import keys, but do not preserve the server-only raw Shortcut source
-or deleted-request history.
+The separate server accepts direct Kassensturz entry fields at **POST /json-import**:
+`date`, `merchant`, `amount`, with optional `kind`, category, payment method, notes,
+groups and split items. See the [server Shortcut guide](https://github.com/philipptillmann/kassensturz/blob/server/docs/SHORTCUT_API.md).
+The standalone Android app retains local storage and has no HTTP server or API keys.
+Its runtime is unchanged; VERSION/versionCode align to 0.11.0/13 for future builds.
+Android backup round trips preserve common financial entries and import keys, but
+not server-only Shortcut sources or deleted-request history. No APK was built.
 
 ### Trade Republic CSV (0.7.0)
 

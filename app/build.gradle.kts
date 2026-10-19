@@ -9,7 +9,7 @@ android {
         applicationId = "de.kassensturz.app"
         minSdk = 28
         targetSdk = 35
-        versionCode = 12
+        versionCode = 13
         versionName = appVersion
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
