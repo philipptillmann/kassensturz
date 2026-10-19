@@ -303,3 +303,14 @@ Bar defaults to cash, and other existing methods default to PayPal/other. Custom
 types survive backups; older backups infer those same defaults. Changing a bank
 account to another type removes its bank settings/transfer pairings after a warning
 and recalculates effective reports, while retaining all transaction records.
+
+### Shortcut selection lists (0.13.0)
+
+The server provides **GET /json-options** with the existing Bearer key. It returns
+current `categories`, bank-only `banks` and all `payment_methods` as sorted name
+arrays for the key's user/dataset. Use those selections as `category` and
+`payment_method` in POST /json-import. No transaction data, balances, IBANs or bank
+settings are exposed. Existing keys work; revocation/password-change rules apply.
+See the [server guide](https://github.com/philipptillmann/kassensturz/blob/server/docs/SHORTCUT_API.md).
+The standalone Android app remains offline; this server-only feature aligns its
+version/build metadata without adding an HTTP service.
