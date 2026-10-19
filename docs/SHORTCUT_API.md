@@ -1,4 +1,4 @@
-# Kassensturz: Buchungen per iPhone-Kurzbefehl erstellen (0.11.0)
+# Kassensturz: Buchungen per iPhone-Kurzbefehl erstellen (0.13.0)
 
 **POST /json-import** erstellt eine Buchung direkt aus deren Feldern.
 
@@ -10,7 +10,51 @@ anlegen bzw. die bestehenden Daten diesem Konto zuordnen. Den einmal angezeigten
 Schlüssel im Kurzbefehl aufbewahren. Der Server speichert nur seinen Hash.
 Bestehende Schlüssel bleiben gültig. Widerruf und Passwortwechsel sperren sie.
 Ein Schlüssel darf nur Buchungen für seinen Benutzer und festen Datensatz anlegen;
-er erlaubt keinen Lese-, Änderungs-, Lösch- oder Backup-Zugriff.
+er darf außerdem die aktuellen Kategorie-, Bank- und Zahlungsmittelnamen abfragen.
+Buchungen, Belege, IBANs, Kontoeinstellungen und Backups kann er nicht lesen, ändern oder löschen.
+
+## Auswahlmöglichkeiten abfragen
+
+**GET /json-options** liefert die aktuellen Namen für den Benutzer und Datensatz
+am API-Schlüssel. Dieselbe Adresse und denselben Bearer-Schlüssel wie beim Anlegen
+verwenden. Ein JSON-Anfragetext oder Content-Type-Header ist für GET nicht nötig.
+
+```sh
+curl http://DEIN-SERVER:8082/json-options \
+  -H 'Authorization: Bearer DEIN_KASSENSTURZ_SCHLUESSEL'
+```
+
+Beispielantwort (tatsächliche Namen stammen aus deinem Datensatz):
+
+```json
+{
+  "categories": ["Ausgehen", "Lebensmittel", "Unkategorisiert"],
+  "banks": ["Beispielbank"],
+  "payment_methods": ["Bar", "Beispielbank", "PayPal"]
+}
+```
+
+- `categories`: aktuelle Kategorienamen, einschließlich umbenannter Kategorien.
+- `banks`: Zahlungsmittel vom Typ **Bankkonto**.
+- `payment_methods`: alle Zahlungsmittel, auch Bargeld und PayPal / Sonstiges.
+
+Alle Listen sind alphabetisch sortiert und dürfen leer sein. Es werden keine
+Buchungen, Beträge, IBANs, Kontoanteile oder Schlüssel zurückgegeben. Die Antwort
+wird nicht zwischengespeichert; Änderungen erscheinen beim nächsten Aufruf.
+
+Im iPhone-Kurzbefehl:
+
+1. **Inhalt von URL abrufen** mit `GET` auf `/json-options`, Header
+   `Authorization: Bearer …`.
+2. **Wörterbuchwert abrufen**, Schlüssel `categories`, dann **Aus Liste auswählen**.
+3. Für Zahlungsmittel ebenso `payment_methods` verwenden; für eine reine
+   Bankauswahl stattdessen `banks`.
+4. Die gewählten Texte direkt als `category` und `payment_method` in die folgende
+   `POST /json-import`-Anfrage einsetzen. Bei leeren Listen die Auswahl überspringen.
+
+Ein ungültiger/widerrufener Schlüssel ergibt **401**, ein anderer ausdrücklich
+angefragter Datensatz oder fremder Ursprung **403**, eine andere Methode **405**.
+Eine normale Browser-Anmeldung ersetzt den Bearer-Schlüssel hier nicht.
 
 ## Anfrage
 

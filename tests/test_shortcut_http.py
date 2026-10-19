@@ -40,6 +40,59 @@ class ShortcutHttpTests(unittest.TestCase):
     def send(self,key,body=None,path='/json-import',headers=None):
         return self.remote.post(path,json=body if body is not None else self.body,headers={'Authorization':'Bearer '+key,**(headers or {})})
 
+    def options(self,key,path='/json-options',headers=None):
+        return self.remote.get(path,headers={'Authorization':'Bearer '+key,**(headers or {})})
+
+    def test_options_current_names_bank_filter_and_no_financial_data(self):
+        from test_accounts import test_iban
+        key=self.key()['token']
+        self.post('payment',dict(name='Example bank',kind='bank',iban=test_iban(1),share_percent='50'))
+        self.post('payment',dict(name='Coins',kind='cash'))
+        self.post('category-rename',dict(old_name='Ausgehen',name='Evening'))
+        saved=self.send(key,{**self.body,'category':'Evening','notes':'Private expense details'})
+        self.assertEqual(saved.status_code,201,saved.json)
+        response=self.options(key);self.assertEqual(response.status_code,200,response.json)
+        self.assertEqual(response.headers['Cache-Control'],'no-store')
+        result=response.json
+        self.assertEqual(set(result),{'categories','banks','payment_methods'})
+        self.assertIn('Evening',result['categories']);self.assertNotIn('Ausgehen',result['categories'])
+        self.assertEqual(result['banks'],['Example bank'])
+        self.assertTrue({'Bar','PayPal','Coins','Example bank'}<=set(result['payment_methods']))
+        for values in result.values():self.assertEqual(values,sorted(values))
+        for secret in ('Private expense details',test_iban(1),'share_bp','transaction_id',key):self.assertNotIn(secret,response.text)
+        self.post('payment',dict(name='Example bank',kind='other'))
+        self.assertEqual(self.options(key).json['banks'],[])
+        self.assertIn('Example bank',self.options(key).json['payment_methods'])
+
+    def test_options_fixed_dataset_and_user_isolation(self):
+        private=self.key()['token'];demo=self.key('demo')['token']
+        self.post('category',dict(name='Owner private category'))
+        self.post('payment',dict(name='Owner bank',kind='bank'))
+        self.assertIn('Owner private category',self.options(private).json['categories'])
+        self.assertNotIn('Owner private category',self.options(demo).json['categories'])
+        self.assertNotIn('Owner bank',self.options(demo).json['banks'])
+        self.assertEqual(self.options(private,path='/json-options?dataset=demo').status_code,403)
+        self.assertEqual(self.options(private,path='/json-options?dataset=private').status_code,200)
+        self.post('users',dict(username='second',password=PASSWORD))
+        other=self.web.test_client();csrf=self.login(other,'second');key=self.key(client=other,csrf=csrf)['token']
+        self.assertNotIn('Owner private category',self.options(key).json['categories'])
+        self.assertNotIn('Owner bank',self.options(key).json['payment_methods'])
+
+    def test_options_auth_methods_revocation_and_password_reset(self):
+        key=self.key()
+        self.assertEqual(self.client.get('/json-options').status_code,401)
+        self.assertEqual(self.options('wrong').status_code,401)
+        self.assertEqual(self.options(key['token'],headers={'Origin':'https://elsewhere.example'}).status_code,403)
+        for method in ('POST','PUT','DELETE','PATCH'):
+            response=self.remote.open('/json-options',method=method,json={},headers={'Authorization':'Bearer '+key['token']})
+            self.assertEqual(response.status_code,405)
+        self.post('shortcut-tokens/revoke',dict(id=key['id']))
+        self.assertEqual(self.options(key['token']).status_code,401)
+        current=self.key()['token']
+        self.post('users/password',dict(current_password=PASSWORD,password=PASSWORD+'-new'))
+        self.assertEqual(self.options(current).status_code,401)
+        self.assertEqual(self.remote.get('/api/data',headers={'Authorization':'Bearer '+current}).status_code,401)
+
     def test_create_only_reveal_hash_storage_and_cookie_only_management(self):
         key=self.key()
         listed=self.client.get('/api/shortcut-tokens')

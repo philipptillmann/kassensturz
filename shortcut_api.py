@@ -81,6 +81,16 @@ def authenticate(auth_db, authorization):
     return user, key['dataset']
 
 
+def options(db):
+    """Names for Shortcut pickers, from one read snapshot; never expose financial rows."""
+    with closing(ledger.connect(db)) as con, con:
+        con.execute('BEGIN')
+        categories = [row[0] for row in con.execute('SELECT name FROM categories ORDER BY name')]
+        payments = [row[0] for row in con.execute('SELECT name FROM payment_methods ORDER BY name')]
+        banks = [row[0] for row in con.execute('SELECT payment_method FROM account_settings ORDER BY payment_method')]
+    return dict(categories=categories, banks=banks, payment_methods=payments)
+
+
 def text(value, field, maximum, required=False):
     if not isinstance(value, str) or len(value) > maximum or required and not value.strip():
         raise ValueError(f'{field}: Text mit {1 if required else 0}–{maximum} Zeichen erwartet.')

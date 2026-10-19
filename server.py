@@ -79,14 +79,15 @@ def create_app(password=None, public_url=None):
 
     @web.before_request
     def access_control():
-        if request.path == '/json-import':
+        if request.path in ('/json-import','/json-options'):
             request.max_content_length = shortcut_api.MAX_BODY
-            if request.method != 'POST':
-                return failure('POST erwartet.', 405)
+            expected_method = 'GET' if request.path == '/json-options' else 'POST'
+            if request.method != expected_method:
+                return failure(expected_method + ' erwartet.', 405)
             expected_origin = public_url or request.host_url.rstrip('/')
             if request.headers.get('Origin') not in (None, expected_origin):
                 return failure('Ungültiger Ursprung.', 403)
-            if not request.is_json:
+            if request.path == '/json-import' and not request.is_json:
                 return failure('JSON erwartet.', 415)
             identity = shortcut_api.authenticate(auth_db, request.headers.get('Authorization'))
             if identity is None:
@@ -244,6 +245,10 @@ def create_app(password=None, public_url=None):
     @web.get('/api/session')
     def session_info():
         return jsonify(csrf=g.csrf, user=users.public(g.user), needs_migration=g.user is None, version=APP_VERSION)
+
+    @web.get('/json-options')
+    def shortcut_options():
+        return jsonify(shortcut_api.options(g.dataset_paths[g.dataset]))
 
     @web.post('/json-import')
     def import_shortcut():
