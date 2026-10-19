@@ -1,4 +1,4 @@
-"""User-scoped one-step expense ingestion, matching Friss's Shortcut envelope."""
+"""User-scoped Kassensturz entry creation for Shortcuts and other JSON clients."""
 from contextlib import closing
 import datetime
 from decimal import Decimal
@@ -15,6 +15,10 @@ MAX_BODY = 256 * 1024
 
 
 class DeletedImport(ValueError):
+    pass
+
+
+class ImportConflict(ValueError):
     pass
 
 
@@ -89,7 +93,7 @@ def request_id(body):
     return str(uuid.uuid5(uuid.NAMESPACE_URL, 'kassensturz-json-import-v1:' + digest)), canonical
 
 
-def envelope(body):
+def legacy_envelope(body):
     if not isinstance(body, dict) or set(body) != {'timestamp','original_message','ai'}:
         raise ValueError('Genau timestamp, original_message und ai werden erwartet.')
     stamp = text(body['timestamp'], 'timestamp', 64, True)
@@ -114,6 +118,39 @@ def envelope(body):
     return parsed.date().isoformat(), ai, identity, canonical
 
 
+ENTRY_FIELDS = {'date','merchant','amount','currency','kind','category','payment_method','notes','group_name','items','request_id'}
+
+def envelope(body):
+    # Retain old clients and archived request fingerprints; new clients send entries directly.
+    if isinstance(body, dict) and set(body) == {'timestamp','original_message','ai'}:
+        return legacy_envelope(body)
+    if not isinstance(body, dict):
+        raise ValueError('Ein JSON-Objekt mit date, merchant und amount wird erwartet.')
+    unknown = set(body) - ENTRY_FIELDS
+    if unknown:
+        raise ValueError('Unbekannte Buchungsfelder: ' + ', '.join(sorted(unknown)))
+    day = text(body.get('date'), 'date', 10, True)
+    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', day):
+        raise ValueError('date muss JJJJ-MM-TT sein.')
+    datetime.date.fromisoformat(day)
+    # Validate required entry fields before looking up a retry.
+    text(body.get('merchant'), 'merchant', 200, True)
+    amount = money(body.get('amount'))
+    if not amount: raise ValueError('Betrag darf nicht null sein.')
+    canonical = json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)
+    client_id = body.get('request_id')
+    if 'request_id' in body:
+        try:
+            client_id = str(uuid.UUID(text(client_id, 'request_id', 36, True)))
+        except (ValueError, AttributeError):
+            raise ValueError('request_id muss eine UUID sein.') from None
+        seed = 'request:' + client_id
+    else:
+        seed = 'payload:' + hashlib.sha256(canonical.encode()).hexdigest()
+    identity = str(uuid.uuid5(uuid.NAMESPACE_URL, 'kassensturz-entry-v2:' + seed))
+    return day, {key:value for key,value in body.items() if key not in ('date','request_id')}, identity, canonical
+
+
 def money(raw):
     if isinstance(raw, bool) or not isinstance(raw, (str,int,float)):
         raise ValueError('Betrag als EUR-Zahl oder Dezimaltext erwartet.')
@@ -123,7 +160,7 @@ def money(raw):
     return value
 
 
-def transaction(ai, day, con):
+def legacy_transaction(ai, day, con, max_notes=2000):
     allowed = {'title','amount','currency','category','payment_method','notes','group_name','items'}
     if set(ai) - allowed:
         raise ValueError('Unbekannte ai-Felder: ' + ', '.join(sorted(set(ai)-allowed)))
@@ -146,7 +183,7 @@ def transaction(ai, day, con):
     payment = text(ai.get('payment_method',''), 'payment_method', 60).strip()
     if payment and not con.execute('SELECT 1 FROM payment_methods WHERE name=?', (payment,)).fetchone():
         raise ValueError('Unbekanntes Zahlungsmittel: ' + payment)
-    notes = text(ai.get('notes',''), 'notes', 2000)
+    notes = text(ai.get('notes',''), 'notes', max_notes)
     group = text(ai.get('group_name',''), 'group_name', 80).strip()
     parts = ai.get('items', [])
     if not isinstance(parts, list) or len(parts) > 200:
@@ -167,21 +204,37 @@ def transaction(ai, day, con):
     return dict(date=day,merchant=title,amount=decimal(amount),kind='expense',category=cat,payment_method=payment,notes=notes,group_name=group,items=converted)
 
 
+def transaction(entry, day, con):
+    kind = entry.get('kind', 'expense')
+    if kind not in ('expense','income'):
+        raise ValueError('kind muss expense oder income sein.')
+    mapped = {key:value for key,value in entry.items() if key not in ('merchant','kind')}
+    mapped['title'] = entry['merchant']
+    data = legacy_transaction(mapped, day, con, max_notes=4000)
+    data['kind'] = kind
+    return data
+
+
 def ingest(body, db):
-    day, ai, identity, canonical = envelope(body)
+    day, fields, identity, canonical = envelope(body)
+    legacy = isinstance(body, dict) and set(body) == {'timestamp','original_message','ai'}
     with closing(ledger.connect(db)) as con, con:
         con.execute('BEGIN IMMEDIATE')
-        previous = con.execute('SELECT transaction_id FROM shortcut_imports WHERE request_id=?', (identity,)).fetchone()
+        previous = con.execute('SELECT transaction_id,payload FROM shortcut_imports WHERE request_id=?', (identity,)).fetchone()
         if previous:
+            if previous['payload'] != canonical:
+                raise ImportConflict('request_id wurde bereits mit anderen Buchungsdaten verwendet.')
             if previous[0] is None:
                 raise DeletedImport('Der ursprüngliche Eintrag wurde gelöscht; derselbe Aufruf wird nicht erneut angelegt.')
             txid, duplicate = previous[0], True
         else:
             prior = con.execute('SELECT id FROM transactions WHERE import_key=?', ('shortcut:'+identity,)).fetchone()
             if prior:
+                if not legacy and 'request_id' in body:
+                    raise ImportConflict('request_id ist bereits vorhanden, aber die ursprüngliche Quellenhistorie fehlt. Buchung in der App prüfen.')
                 txid, duplicate = prior[0], True
             else:
-                data = transaction(ai, day, con)
+                data = legacy_transaction(fields, day, con) if legacy else transaction(fields, day, con)
                 txid = ledger.save_transaction(data, db=db, _connection=con)['id']
                 con.execute('UPDATE transactions SET import_key=? WHERE id=?', ('shortcut:'+identity,txid))
                 duplicate = False

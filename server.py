@@ -250,7 +250,7 @@ def create_app(password=None, public_url=None):
         try:
             result, status = shortcut_api.ingest(request.get_json(), g.dataset_paths[g.dataset])
             return jsonify(result), status
-        except shortcut_api.DeletedImport as error:
+        except (shortcut_api.DeletedImport, shortcut_api.ImportConflict) as error:
             return failure(str(error), 409)
         except ValueError as error:
             return failure(str(error), 422)

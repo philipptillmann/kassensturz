@@ -502,20 +502,15 @@ upload limit/timeout. ZIPs contain unencrypted private financial data: protect
 them and keep them outside Git. CSV is a spreadsheet export, not a full backup.
 
 
-### iPhone-Kurzbefehls-API (0.6.0)
+### iPhone-Kurzbefehls-API (0.11.0)
 
-Wie in Friss speichert **POST /json-import** eine Ausgabe in einem Aufruf mit
-Bearer-Schlüssel und den Feldern `timestamp`, `original_message`, `ai` (Text oder
-Objekt). **Einstellungen → iPhone-Kurzbefehle** erstellt/widerruft Schlüssel für
-je einen Benutzer und festen Privat-/Demo-Datensatz. Beträge werden geprüft;
-identische Retries erzeugen keine doppelte Buchung. Originale sind im Editor
-unter Kurzbefehlsquelle sichtbar und in Server-ZIP-Sicherungen enthalten.
-
-Die vollständige [iPhone-Anleitung mit Format und Beispiel](docs/AI_SHORTCUT.md)
-und der [deutsche AI-Prompt](docs/AI_PROMPT_DE.txt) liegen im Projekt. Der Server
-ruft kein Modell auf. Diese Integration ist ausdrücklich serverseitig; die
-Standalone-Android-App bleibt offline und erhält nur die gemeinsame Versions-
-und Build-Metadatenanpassung für 0.6.0.
+**POST /json-import** erstellt Buchungen direkt aus `date`, `merchant` und
+`amount`. Optional: `kind`, `category`, `payment_method`, `notes`, `group_name`,
+`items`, `currency` und `request_id`. Ausgaben, Erstattungen und Einnahmen werden
+wie im Buchungsformular erfasst. Einstellungen → iPhone-Kurzbefehle verwaltet
+Bearer-Schlüssel für einen Benutzer und festen Datensatz. Retries erzeugen keine
+doppelten Buchungen. Die [Anleitung mit Beispiel](docs/SHORTCUT_API.md) beschreibt
+alle Felder. Diese Integration ist serverseitig; Android bleibt offline.
 
 ### Trade Republic CSV (0.7.0)
 

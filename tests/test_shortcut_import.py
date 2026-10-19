@@ -16,7 +16,7 @@ class ShortcutImportTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.db = Path(self.tmp.name) / 'private.sqlite3'
         app.init(self.db)
-        self.body = json.loads((app.ROOT/'docs/examples/shortcut-expense.json').read_text())
+        self.body = dict(timestamp='2026-10-18T18:30:00+02:00',original_message='Synthetic legacy fixture',ai=dict(title='Restaurant',amount='24.50',currency='EUR',category='Ausgehen',payment_method='Bar',notes=''))
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -25,7 +25,7 @@ class ShortcutImportTests(unittest.TestCase):
         with app.connect(self.db) as con:
             return con.execute('SELECT count(*) FROM transactions').fetchone()[0]
 
-    def test_one_step_documented_example_timezone_totals_and_key_order_retry(self):
+    def test_legacy_timezone_totals_and_key_order_retry(self):
         body = {**self.body,'timestamp':'2026-10-18T00:15:00+02:00'}
         first,status = shortcut_api.ingest(body,self.db)
         self.assertEqual(status,201)

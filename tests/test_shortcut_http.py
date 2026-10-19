@@ -112,9 +112,20 @@ class ShortcutHttpTests(unittest.TestCase):
     def test_overscoped_fields_and_invalid_splits_do_not_partially_save(self):
         key=self.key()['token']
         for change in [dict(id=1),dict(user_id=2),dict(items=[dict(name='Part',amount='1')]),dict(category='Missing'),dict(amount=True)]:
-            response=self.send(key,{**self.body,'ai':{**self.body['ai'],**change}})
+            response=self.send(key,{**self.body,**change})
             self.assertEqual(response.status_code,422,response.json)
         self.assertEqual(self.client.get('/api/data').json['transactions'],[])
+
+    def test_direct_income_uuid_conflict_and_documented_minimum(self):
+        key=self.key()['token']
+        minimum=dict(date='2026-10-19',merchant='Salary',amount='100',kind='income',request_id='11111111-1111-4111-8111-111111111111')
+        first=self.send(key,minimum);self.assertEqual(first.status_code,201,first.json)
+        self.assertEqual(self.send(key,minimum).status_code,200)
+        self.assertEqual(self.send(key,{**minimum,'amount':'200'}).status_code,409)
+        row=self.client.get('/api/data').json['transactions'][0]
+        self.assertEqual((row['kind'],row['amount']),('income',-10000))
+        for change in [dict(date='2026-02-30'),dict(ai={}),dict(merchant=''),dict(original_message='unused')]:
+            self.assertEqual(self.send(key,{**self.body,**change}).status_code,422)
 
     def test_financial_restore_preserves_key_and_restores_retry_history(self):
         key=self.key()['token'];first=self.send(key)
