@@ -215,11 +215,11 @@ class MainActivity : Activity() {
         val cats=box(content);label(cats,"Kategorien",20f,true);label(cats,"Antippen zum Umbenennen, auch in gespeicherten Einträgen.",13f,color=muted)
         data.categories.forEach { old -> button(cats,old) { val f=form();val name=field(f,"Name",old);dialog("Kategorie umbenennen",f) { change({store.renameCategory(old,name.text.toString())}) } } }
         button(cats,"+ Kategorie") { nameDialog(true) }
-        val payments=box(content);label(payments,"Zahlungsmittel",20f,true);label(payments,data.payments.joinToString(" · "));button(payments,"+ Zahlungsmittel") { nameDialog(false) }
-        val accounts=box(content);label(accounts,"Eigene Konten",20f,true)
-        data.accounts.forEach { a -> button(accounts,"${a.name} · ${amountText(a.share.toLong())} %") { accountDialog(a) } }
-        button(accounts,"+ Eigenes Konto / Gemeinschaftskonto") { accountDialog(null) }
-        label(accounts,"Anteile gelten nur bei effektiven Kosten. Einnahmen bleiben von Ausgaben getrennt.",13f,color=muted)
+        val payments=box(content);label(payments,"Zahlungsmittel",20f,true)
+        data.payments.forEach { name -> val bank=data.accounts.find { it.name==name };val kind=if(bank!=null) "Bankkonto" else if((data.paymentTypes[name] ?: if(name=="Bar") "cash" else "other")=="cash") "Bargeld" else "PayPal / Sonstiges"
+            button(payments,"$name · $kind") { paymentDialog(name) }
+        }
+        button(payments,"+ Zahlungsmittel") { paymentDialog() }
         val transfers=box(content);label(transfers,"Umbuchungen",20f,true)
         data.transfers.forEach { pair -> val a=data.entries.find { it.id==pair.outgoing };val b=data.entries.find { it.id==pair.incoming }
             button(transfers,"${a?.payment} → ${b?.payment} · ${money(a?.amount ?: 0)} · Aufheben") { change({store.unlink(pair)}) } }
@@ -248,13 +248,23 @@ class MainActivity : Activity() {
         val info=box(content);label(info,"Kassensturz für Android",20f,true);label(info,"Version ${packageManager.getPackageInfo(packageName,0).versionName} · Alle Daten auf diesem Gerät",14f,color=muted)
     }
     private fun nameDialog(category: Boolean) { val f=form();val name=field(f,"Name");dialog(if(category)"Kategorie anlegen" else "Zahlungsmittel anlegen",f) { val value=name.text.toString();require(value.trim().isNotEmpty()) { "Name fehlt." };change({store.addName(value,category)}) } }
-    private fun accountDialog(account: Account?) {
-        val f=form();val name=field(f,"Kontoname / Zahlungsmittel",account?.name ?: "")
-        if(account!=null)name.isEnabled=false
-        val share=field(f,"Mein Anteil in Prozent",amountText((account?.share ?: 10000).toLong()),true)
-        val income=check(f,"Anteil auch auf eingehende Beträge anwenden",account?.shareIncome ?: true)
-        val iban=field(f,"IBAN (optional)",account?.iban ?: "")
-        dialog("Eigenes Konto",f) { val a=Account(name.text.toString().trim(),Ledger.cents(share.text.toString()).also { require(it in 0..10000) { "Anteil: 0–100 %." } }.toInt(),income.isChecked,Store.normalizeIban(iban.text.toString()));require(a.share in 0..10000) { "Anteil: 0–100 %." };change({store.configure(a)}) }
+    private fun paymentDialog(existing:String?=null) {
+        val f=form();val bank=data.accounts.find { it.name==existing };val name=field(f,"Name",existing ?: "");name.isEnabled=existing==null
+        val initial=if(bank!=null) "Bankkonto" else if((existing?.let { data.paymentTypes[it] } ?: if(existing=="Bar") "cash" else "other")=="cash") "Bargeld" else "PayPal / Sonstiges"
+        val type=select(f,"Typ",listOf("Bargeld","Bankkonto","PayPal / Sonstiges"),initial)
+        val fields=column(f)
+        val iban=field(fields,"IBAN (optional)",bank?.iban ?: "")
+        val share=field(fields,"Mein Anteil in Prozent",amountText((bank?.share ?: 10000).toLong()),true)
+        val income=check(fields,"Anteil auch auf eingehende Beträge anwenden",bank?.shareIncome ?: true)
+        label(fields,"Anteile gelten in der effektiven Ansicht. Die IBAN hilft beim Erkennen interner Umbuchungen.",13f,color=muted)
+        type.onItemSelectedListener=object:AdapterView.OnItemSelectedListener { override fun onItemSelected(p:AdapterView<*>?,v:View?,position:Int,id:Long){ fields.visibility=if(position==1) View.VISIBLE else View.GONE };override fun onNothingSelected(p:AdapterView<*>?){} }
+        fields.visibility=if(type.selectedItemPosition==1) View.VISIBLE else View.GONE
+        dialog("Zahlungsmittel",f) {
+            val cleaned=name.text.toString().trim();val kind=listOf("cash","bank","other")[type.selectedItemPosition]
+            val account=if(kind=="bank") Account(cleaned,Ledger.cents(share.text.toString()).also { require(it in 0..10000) { "Anteil: 0–100 %." } }.toInt(),income.isChecked,Store.normalizeIban(iban.text.toString())) else null
+            val save={ change({store.configurePayment(cleaned,kind,account)}) }
+            if(bank!=null && kind!="bank") confirm("Kontotyp ändern?","IBAN, Kontoanteil und zugehörige Umbuchungszuordnungen werden entfernt. Dies wirkt auf bisherige Auswertungen. Buchungen bleiben erhalten.") { save() } else save()
+        }
     }
     private inner class Editor(val original: Entry?, draft: Bundle? = null) {
         val base=form()
@@ -390,14 +400,15 @@ class MainActivity : Activity() {
     }
     private fun importCsv(text:String) {
         val f=form();val delimiter=select(f,"Trennzeichen",listOf("Semikolon (;)","Komma (,)","Tabulator"))
-        val account=field(f,"Konto / Zahlungsmittel")
+        val account=select(f,"Zahlungsmittel",data.payments)
+        label(f,"Neue Zahlungsmittel vorher in den Einstellungen anlegen.",13f,color=muted)
         val cat=select(f,"Kategorie für importierte Buchungen",data.categories,"Unkategorisiert")
         val signs=check(f,"Bank-Vorzeichen: Abbuchungen negativ",true)
         val income=check(f,"Alle Gutschriften als Einnahmen (statt Erstattungen)",false)
         label(f,"ING-Vorspann wird automatisch erkannt; sonst muss die erste Zeile Spaltennamen enthalten. Im nächsten Schritt Spalten zuordnen und Vorschau prüfen.",14f,color=muted)
         dialog("Bank-CSV",f,"Spalten zuordnen") {
             val rows=BankCsv.parse(text,when(delimiter.selectedItemPosition){1->',';2->'\t';else->';'})
-            require(rows.size>1) { "Keine CSV-Daten gefunden." };require(account.text.isNotBlank()) { "Konto fehlt." }
+            require(rows.size>1) { "Keine CSV-Daten gefunden." };require(account.selectedItem!=null) { "Konto fehlt." }
             val tr=BankCsv.isTradeRepublic(rows);val ing=BankCsv.isIng(rows);val vb=BankCsv.isVolksbank(rows)
             val mapping=form();val source=if(vb) select(mapping,"Quellkonto in der CSV",listOf("Bitte auswählen")+BankCsv.volksbankAccounts(rows)) else null
             if(vb) label(mapping,"Volksbank erkannt: Quellkonto und passendes Zahlungsmittel wählen. Gutschriften anschließend als Einnahme oder Erstattung prüfen. Keine eindeutige ID: Teilimporte identischer Buchungen manuell prüfen.",14f,color=muted)
@@ -418,8 +429,8 @@ class MainActivity : Activity() {
             }
             dialog("Spalten zuordnen",mapping,"Vorschau") {
                 if(vb) require(source!!.selectedItemPosition>0) { "Bitte Quellkonto auswählen." }
-                val provider=if(vb) BankCsv.volksbank(rows,account.text.toString(),cat.selectedItem.toString(),source!!.selectedItem.toString()) else if(ing) BankCsv.ing(rows,account.text.toString(),cat.selectedItem.toString()) else if(tr) BankCsv.tradeRepublic(rows,account.text.toString(),cat.selectedItem.toString()) else null
-                val entries=provider?.entries ?: BankCsv.entries(rows,date.selectedItemPosition,merchant.selectedItemPosition,amount.selectedItemPosition,account.text.toString(),cat.selectedItem.toString(),signs.isChecked,iban.selectedItemPosition-1,income.isChecked)
+                val provider=if(vb) BankCsv.volksbank(rows,account.selectedItem.toString(),cat.selectedItem.toString(),source!!.selectedItem.toString()) else if(ing) BankCsv.ing(rows,account.selectedItem.toString(),cat.selectedItem.toString()) else if(tr) BankCsv.tradeRepublic(rows,account.selectedItem.toString(),cat.selectedItem.toString()) else null
+                val entries=provider?.entries ?: BankCsv.entries(rows,date.selectedItemPosition,merchant.selectedItemPosition,amount.selectedItemPosition,account.selectedItem.toString(),cat.selectedItem.toString(),signs.isChecked,iban.selectedItemPosition-1,income.isChecked)
                 require(entries.isNotEmpty()) { "Keine unterstützten Buchungen mit Betrag gefunden.\n"+provider?.excluded.orEmpty().joinToString("\n") }
                 work({store.previewImport(entries)}) { counts ->
                     confirm("${counts.first} neue Buchungen importieren?", (provider?.excluded?.takeIf { it.isNotEmpty() }?.let { "${it.size} ausgeschlossene Zeilen:\n"+it.joinToString("\n")+"\n\n" } ?: "")+"${counts.second} bereits vorhandene werden übersprungen.\n\n"+entries.take(8).joinToString("\n") { "${it.date} · ${it.merchant}${if(it.kind=="income") " (Einnahme)" else ""} · ${money(it.amount)}" }+"\n\nDie Prüfung wird beim Speichern wiederholt. Gutschriften können anschließend als Einnahme oder Erstattung bearbeitet werden.") {

@@ -34,10 +34,34 @@ class StoreTest {
     }
     @After fun tearDown() { db.close();folder.deleteRecursively() }
     private fun entry()=Entry(date="2026-10-01",merchant="Gift",amount=5000,category="Shopping",payment="Bankkarte",group="Gift",notes="Keep me",parts=listOf(Part("A",3000,"Shopping","Gift"),Part("B",2000,"Freizeit","")))
+    @Test fun testUnifiedPaymentTypesBankConversionAndBackup() {
+        db.configurePayment("Pocket cash","cash")
+        db.configurePayment("Shared","bank",Account("Shared",5000))
+        val id=db.save(entry().copy(payment="Shared"))
+        assertEquals("cash",db.snapshot().paymentTypes["Pocket cash"])
+        assertEquals(5000,db.snapshot().accounts.single { it.name=="Shared" }.share)
+        val output=ByteArrayOutputStream();db.backup(output)
+        db.restore(ByteArrayInputStream(output.toByteArray()))
+        assertEquals("cash",db.snapshot().paymentTypes["Pocket cash"])
+        db.configurePayment("Shared","other")
+        assertFalse(db.snapshot().accounts.any { it.name=="Shared" })
+        assertEquals("other",db.snapshot().paymentTypes["Shared"])
+        assertEquals("Shared",db.snapshot().entries.single { it.id==id }.payment)
+        db.configurePayment("Pocket cash","bank",Account("Pocket cash"))
+        assertFalse(db.snapshot().paymentTypes.containsKey("Pocket cash"))
+    }
+    @Test fun testUpgradeFromVersionThreeAddsPaymentTypesWithoutChangingAccounts() {
+        db.configure(Account("Shared",5000));db.save(entry());db.close()
+        SQLiteDatabase.openDatabase(isolated.getDatabasePath("private.sqlite3").path,null,SQLiteDatabase.OPEN_READWRITE).use { sql ->sql.execSQL("DROP TABLE payment_types");sql.version=3 }
+        db=Store(isolated,false)
+        assertEquals(1,db.snapshot().entries.size);assertEquals(5000,db.snapshot().accounts.single().share)
+        assertTrue(db.snapshot().paymentTypes.isEmpty())
+        db.configurePayment("Coins","cash");assertEquals("cash",db.snapshot().paymentTypes["Coins"])
+    }
     @Test fun testCsvUndoUpgradeFromVersionTwoRetainsEntries() {
         db.save(entry());db.close()
         SQLiteDatabase.openDatabase(isolated.getDatabasePath("private.sqlite3").path,null,SQLiteDatabase.OPEN_READWRITE).use { sql ->
-            sql.execSQL("DROP TABLE csv_undo_entries");sql.execSQL("DROP TABLE csv_undo");sql.version=2
+            sql.execSQL("DROP TABLE csv_undo_entries");sql.execSQL("DROP TABLE csv_undo");sql.execSQL("DROP TABLE payment_types");sql.version=2
         }
         db=Store(isolated,false)
         assertEquals(1,db.snapshot().entries.size);assertNull(db.lastCsvImport())

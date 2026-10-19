@@ -26,9 +26,9 @@ private fun JSONArray.strings() = (0 until length()).map { getString(it) }
 
 data class BackupSummary(val entries: Int, val receipts: Int, val dataset: String, val createdAt: String)
 
-data class Snapshot(val entries: List<Entry>, val categories: List<String>, val payments: List<String>, val accounts: List<Account>, val transfers: List<Transfer>, val ignored: List<Transfer> = emptyList())
+data class Snapshot(val entries: List<Entry>, val categories: List<String>, val payments: List<String>, val accounts: List<Account>, val transfers: List<Transfer>, val ignored: List<Transfer> = emptyList(), val paymentTypes: Map<String,String> = emptyMap())
 
-class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if (demo) "demo.sqlite3" else "private.sqlite3", null, 3) {
+class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if (demo) "demo.sqlite3" else "private.sqlite3", null, 4) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE categories(name TEXT PRIMARY KEY NOT NULL)")
@@ -39,14 +39,28 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         db.execSQL("CREATE TABLE transfers(outgoing INTEGER PRIMARY KEY REFERENCES entries(id) ON DELETE CASCADE,incoming INTEGER UNIQUE REFERENCES entries(id) ON DELETE CASCADE)")
         db.execSQL("CREATE TABLE ignored(outgoing INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,incoming INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,PRIMARY KEY(outgoing,incoming))")
         createCsvUndo(db)
+        createPaymentTypes(db)
         listOf("Unkategorisiert","Lebensmittel","Wohnen","Mobilität","Freizeit","Ausgehen","Shopping","Gesundheit","Gehalt","Geschenke","Sonstige Einnahmen").forEach { db.insertOrThrow("categories",null,values("name" to it)) }
         listOf("Bar","PayPal","Bankkarte").forEach { db.insertOrThrow("payments",null,values("name" to it)) }
         if (demo) seed(db)
     }
     override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) {
-        require(old >= 1 && new <= 3) { "Unbekannte Datenbankversion $old → $new" }
+        require(old >= 1 && new <= 4) { "Unbekannte Datenbankversion $old → $new" }
+        if(old < 4) createPaymentTypes(db)
         if(old < 3) createCsvUndo(db)
         if(old < 2) db.insertWithOnConflict("categories",null,values("name" to "Ausgehen"),SQLiteDatabase.CONFLICT_IGNORE)
+    }
+    private fun createPaymentTypes(db:SQLiteDatabase) { db.execSQL("CREATE TABLE payment_types(name TEXT PRIMARY KEY REFERENCES payments(name) ON DELETE CASCADE,kind TEXT NOT NULL CHECK(kind IN ('cash','other')))") }
+    fun configurePayment(name:String,kind:String,account:Account?=null) = transaction { db ->
+        val cleaned=name.trim();require(cleaned.isNotEmpty() && cleaned.length<=60 && kind in listOf("cash","bank","other")) { "Ungültiges Zahlungsmittel." }
+        if(kind=="bank") { require(account!=null && account.name==cleaned) { "Kontoeinstellungen fehlen." };configure(account) }
+        else {
+            db.insertWithOnConflict("payments",null,values("name" to cleaned),SQLiteDatabase.CONFLICT_IGNORE)
+            for(table in listOf("transfers","ignored")) db.delete(table,"outgoing IN (SELECT id FROM entries WHERE payment=?) OR incoming IN (SELECT id FROM entries WHERE payment=?)",arrayOf(cleaned,cleaned))
+            db.delete("accounts","name=?",arrayOf(cleaned))
+            db.insertWithOnConflict("payment_types",null,values("name" to cleaned,"kind" to kind),SQLiteDatabase.CONFLICT_REPLACE)
+            reconcile()
+        }
     }
     private fun createCsvUndo(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE csv_undo(id INTEGER PRIMARY KEY CHECK(id=1),token TEXT NOT NULL,created_at TEXT NOT NULL)")
@@ -100,7 +114,8 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         val accounts = db.rawQuery("SELECT * FROM accounts ORDER BY name",null).use { c -> buildList { while(c.moveToNext()) add(Account(c.getString(0),c.getInt(1),c.getInt(2)==1,c.getString(3))) } }
         val transfers = db.rawQuery("SELECT * FROM transfers",null).use { c -> buildList { while(c.moveToNext()) add(Transfer(c.getLong(0),c.getLong(1))) } }
         val ignored=db.rawQuery("SELECT * FROM ignored",null).use { c -> buildList { while(c.moveToNext()) add(Transfer(c.getLong(0),c.getLong(1))) } }
-        return Snapshot(entries,names("categories"),names("payments"),accounts,transfers,ignored)
+        val types=db.rawQuery("SELECT name,kind FROM payment_types",null).use { c -> buildMap<String,String> { while(c.moveToNext())put(c.getString(0),c.getString(1)) } }
+        return Snapshot(entries,names("categories"),names("payments"),accounts,transfers,ignored,types)
     }
     fun addName(name: String, category: Boolean) {
         val cleaned = name.trim(); require(cleaned.isNotEmpty() && cleaned.length <= 60) { "Name: 1–60 Zeichen." }
@@ -119,6 +134,7 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         val iban = normalizeIban(account.iban)
         require(iban.isEmpty() || !db.rawQuery("SELECT 1 FROM accounts WHERE iban=? AND name!=?",arrayOf(iban,account.name)).use { it.moveToFirst() }) { "IBAN bereits vergeben." }
         db.insertWithOnConflict("payments",null,values("name" to account.name),SQLiteDatabase.CONFLICT_IGNORE)
+        db.delete("payment_types","name=?",arrayOf(account.name))
         // UPDATE instead of REPLACE: preserve foreign-key identity.
         val v = values("share" to account.share,"share_income" to if(account.shareIncome) 1 else 0,"iban" to iban)
         if (db.update("accounts",v,"name=?",arrayOf(account.name))==0) { v.put("name",account.name); db.insertOrThrow("accounts",null,v) }
@@ -194,6 +210,7 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         require(s.entries.size <= 50000 && s.categories.size <= 2000 && s.payments.size <= 2000) { "Datensatz für dieses Sicherungsformat zu groß." }
         readableDatabase.rawQuery("SELECT COALESCE(SUM(length(image)),0) FROM receipts",null).use { c -> c.moveToFirst();require(c.getLong(0)<=512_000_000) { "Belege für dieses Sicherungsformat zu groß (max. 512 MB)." } }
         val metadata=JSONObject().put("format","kassensturz-android").put("version",1).put("category_defaults_version",1).put("dataset",if(demo)"demo" else "private").put("created_at",java.time.Instant.now().toString())
+            .put("payment_types",JSONObject(s.paymentTypes))
             .put("categories",JSONArray(s.categories)).put("payments",JSONArray(s.payments))
             .put("entries",JSONArray().apply { s.entries.forEach { put(entryJson(it)) } })
             .put("accounts",JSONArray().apply { s.accounts.forEach { put(JSONObject().put("name",it.name).put("share",it.share).put("share_income",it.shareIncome).put("iban",it.iban)) } })
@@ -220,7 +237,7 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
             val rows=meta.getJSONArray("entries").objects()
             require(rows.size <= 50000) { "Zu viele Buchungen." }
             val expectedReceipts=mutableSetOf<Long>()
-            listOf("csv_undo_entries","csv_undo","ignored","transfers","receipts","entries","accounts","payments","categories").forEach { db.delete(it,null,null) }
+            listOf("csv_undo_entries","csv_undo","ignored","transfers","receipts","entries","accounts","payment_types","payments","categories").forEach { db.delete(it,null,null) }
             cats.forEach { db.insertOrThrow("categories",null,values("name" to it)) }; payments.forEach { db.insertOrThrow("payments",null,values("name" to it)) }
             rows.forEach { j ->
                 val e=Entry(id=j.exactLong("id"),date=j.getString("date"),merchant=j.getString("merchant"),amount=j.exactLong("amount"),category=j.getString("category"),payment=j.getString("payment"),kind=j.getString("kind"),notes=j.getString("notes"),group=j.getString("group"),parts=parseParts(j.getJSONArray("parts").toString()),counterparty=j.getString("counterparty"),importKey=if(j.isNull("import_key")) null else j.getString("import_key"))
@@ -231,6 +248,11 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
                 if(j.getBoolean("receipt")) expectedReceipts.add(e.id)
             }
             meta.getJSONArray("accounts").objects().forEach { j -> configure(Account(j.getString("name"),j.getInt("share"),j.getBoolean("share_income"),j.getString("iban")),autoMatch=false) }
+            meta.optJSONObject("payment_types")?.let { types ->
+                require(types.length()<=2000) { "Zu viele Zahlungsmitteltypen." }
+                val bankNames=snapshot().accounts.map { it.name }.toSet()
+                types.keys().forEach { name -> val kind=types.getString(name);require(name in payments && name !in bankNames && kind in listOf("cash","other")) { "Ungültiger Zahlungsmitteltyp." };db.insertOrThrow("payment_types",null,values("name" to name,"kind" to kind)) }
+            }
             meta.getJSONArray("transfers").objects().forEach { j -> link(Transfer(j.exactLong("outgoing"),j.exactLong("incoming"))) }
             meta.optJSONArray("ignored")?.objects()?.forEach { j ->
                 db.insertOrThrow("ignored",null,values("outgoing" to j.exactLong("outgoing"),"incoming" to j.exactLong("incoming")))
