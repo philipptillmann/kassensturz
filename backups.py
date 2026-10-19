@@ -18,7 +18,7 @@ MAX_METADATA = 16_000_000
 MAX_RECEIPT = 4_000_000
 MAX_RECEIPTS = 512_000_000
 TABLES = ('shortcut_imports', 'transfer_ignored', 'transfer_links', 'receipt_images', 'items',
-          'transactions', 'account_settings', 'category_aliases', 'payment_methods', 'categories')
+          'transactions', 'account_settings', 'payment_types', 'category_aliases', 'payment_methods', 'categories')
 
 
 def text(value, limit, empty=True):
@@ -142,6 +142,12 @@ def _insert_metadata(meta, con):
         if iban and con.execute('SELECT 1 FROM account_settings WHERE iban=?', (iban,)).fetchone():
             raise ValueError('Doppelte Konto-IBAN.')
         con.execute('INSERT INTO account_settings VALUES (?,?,?,?)', (name,share,int(flag(setting['share_income'])),iban))
+    types = meta.get('payment_types', {})
+    if not isinstance(types, dict) or len(types)>2000: raise ValueError('Ungültige Zahlungsmitteltypen.')
+    for name, kind in types.items():
+        if name not in payments or kind not in ('cash','other') or con.execute('SELECT 1 FROM account_settings WHERE payment_method=?',(name,)).fetchone():
+            raise ValueError('Ungültiger Zahlungsmitteltyp.')
+        con.execute('INSERT INTO payment_types VALUES (?,?)', (name,kind))
     used = set()
     for field, table in [('transfers','transfer_links'), ('ignored','transfer_ignored')]:
         pairs = meta.get(field, [])

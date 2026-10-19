@@ -358,7 +358,7 @@ def create_app(password=None, public_url=None):
             candidates = [pair for pair in accounts.candidate_pairs(con) if pair['outgoing_id'] not in linked and pair['incoming_id'] not in linked]
             for transaction in transactions:
                 transaction['internal_transfer'] = transaction['id'] in linked
-        return jsonify(transactions=transactions, categories=categories, payment_methods=payments, default_category=default_category, accounts=account_settings, transfer_links=links, transfer_candidates=candidates, transfer_rejected=rejected, dataset=g.dataset)
+        return jsonify(transactions=transactions, categories=categories, payment_methods=payments, payment_details=accounts.payment_details(g.dataset_paths[g.dataset]), default_category=default_category, accounts=account_settings, transfer_links=links, transfer_candidates=candidates, transfer_rejected=rejected, dataset=g.dataset)
 
     @web.get('/api/receipt/<int:transaction_id>')
     def receipt_image(transaction_id):
@@ -469,6 +469,8 @@ def create_app(password=None, public_url=None):
                 con.execute('DELETE FROM transfer_ignored WHERE outgoing_id=? AND incoming_id=?', (int(data['outgoing_id']),int(data['incoming_id'])))
             accounts.reconcile_transfers(g.dataset_paths[g.dataset])
             result = {'ok': True}
+        elif action == 'payment':
+            result = accounts.configure_payment(data, g.dataset_paths[g.dataset])
         elif action == 'payment-method':
             name = data.get('name')
             if not isinstance(name, str) or not name.strip() or len(name.strip()) > 60:

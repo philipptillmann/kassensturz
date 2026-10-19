@@ -24,6 +24,7 @@ def init(db=None):
         CREATE TABLE IF NOT EXISTS categories(name TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS category_aliases(alias TEXT PRIMARY KEY, name TEXT NOT NULL REFERENCES categories(name));
         CREATE TABLE IF NOT EXISTS payment_methods(name TEXT PRIMARY KEY);
+        CREATE TABLE IF NOT EXISTS payment_types(name TEXT PRIMARY KEY REFERENCES payment_methods(name) ON DELETE CASCADE, kind TEXT NOT NULL CHECK(kind IN ('cash','other')));
         CREATE TABLE IF NOT EXISTS transactions(id INTEGER PRIMARY KEY, date TEXT NOT NULL, merchant TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name), import_key TEXT UNIQUE);
         CREATE TABLE IF NOT EXISTS items(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, name TEXT NOT NULL, amount INTEGER NOT NULL, category TEXT NOT NULL REFERENCES categories(name));
         CREATE TABLE IF NOT EXISTS receipt_images(transaction_id INTEGER PRIMARY KEY REFERENCES transactions(id) ON DELETE CASCADE, image BLOB NOT NULL);

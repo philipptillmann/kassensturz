@@ -154,6 +154,20 @@ class ServerTests(unittest.TestCase):
         self.login(restarted)
         self.assertEqual(restarted.get('/api/data').json['transactions'][0]['amount'], 450)
 
+    def test_unified_payment_editor_api_preserves_names_and_bank_settings(self):
+        csrf=self.login()
+        self.assertEqual(self.post('/api/payment',dict(name='Shared',kind='bank',share_percent='50'),csrf).status_code,200)
+        data=self.client.get('/api/data').json
+        self.assertEqual([p for p in data['payment_details'] if p['name']=='Shared'],[dict(name='Shared',kind='bank')])
+        self.assertEqual(data['payment_methods'].count('Shared'),1)
+        self.assertEqual(next(a for a in data['accounts'] if a['payment_method']=='Shared')['share_bp'],5000)
+        self.assertEqual(self.post('/api/payment',dict(name='Coins',kind='cash'),csrf).status_code,200)
+        self.assertEqual(self.post('/api/payment',dict(name='Shared',kind='bank',share_percent='200'),csrf).status_code,400)
+        self.assertEqual(self.post('/api/payment',dict(name='Shared',kind='other'),csrf).status_code,200)
+        data=self.client.get('/api/data').json
+        self.assertFalse(any(a['payment_method']=='Shared' for a in data['accounts']))
+        self.assertEqual(next(p for p in data['payment_details'] if p['name']=='Coins')['kind'],'cash')
+
     def test_volksbank_source_selection_and_undo_api(self):
         from test_volksbank import sample,booking,SOURCE,OTHER
         csrf=self.login();data={'text':sample(booking(),booking(source=OTHER)),'payment_method':'Bar'}

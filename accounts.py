@@ -1,4 +1,5 @@
 """Own-account configuration and conservative internal transfer matching."""
+from contextlib import nullcontext
 import datetime
 from collections import Counter
 import re
@@ -21,7 +22,7 @@ def normalize_iban(value):
     return iban
 
 
-def configure_account(data, db):
+def configure_account(data, db, *, _connection=None, _reconcile=True):
     name = data.get('name')
     if not isinstance(name, str) or not name.strip() or len(name.strip()) > 60:
         raise ValueError('Kontoname muss 1–60 Zeichen enthalten.')
@@ -35,12 +36,41 @@ def configure_account(data, db):
     if not isinstance(share_income, bool):
         raise ValueError('Ungültige Anteilseinstellung.')
     iban = normalize_iban(data.get('iban', ''))
-    with ledger.connect(db) as con:
+    with (nullcontext(_connection) if _connection is not None else ledger.connect(db)) as con:
         if iban and con.execute('SELECT 1 FROM account_settings WHERE iban=? AND payment_method!=?', (iban, name.strip())).fetchone():
             raise ValueError('Diese IBAN ist bereits einem Konto zugeordnet.')
         con.execute('INSERT OR IGNORE INTO payment_methods VALUES (?)', (name.strip(),))
+        con.execute('DELETE FROM payment_types WHERE name=?', (name.strip(),))
         con.execute('INSERT INTO account_settings VALUES (?,?,?,?) ON CONFLICT(payment_method) DO UPDATE SET share_bp=excluded.share_bp,share_income=excluded.share_income,iban=excluded.iban',
                     (name.strip(), int(share * 100), int(share_income), iban))
+    if _reconcile: reconcile_transfers(db)
+    return {'ok': True}
+
+
+def payment_details(db):
+    with ledger.connect(db) as con:
+        bank = {row['payment_method']: dict(row) for row in con.execute('SELECT * FROM account_settings')}
+        types = dict(con.execute('SELECT name,kind FROM payment_types'))
+        return [dict(name=row[0], kind='bank' if row[0] in bank else types.get(row[0], 'cash' if row[0]=='Bar' else 'other')) for row in con.execute('SELECT name FROM payment_methods ORDER BY name')]
+
+
+def configure_payment(data, db):
+    name = data.get('name')
+    if not isinstance(name, str) or not name.strip() or len(name.strip())>60:
+        raise ValueError('Name muss 1–60 Zeichen enthalten.')
+    name = name.strip()
+    kind = data.get('kind')
+    if kind not in ('bank','cash','other'): raise ValueError('Unbekannter Zahlungsmitteltyp.')
+    with ledger.connect(db) as con:
+        con.execute('BEGIN IMMEDIATE')
+        if kind == 'bank':
+            configure_account(data, db, _connection=con, _reconcile=False)
+        else:
+            con.execute('INSERT OR IGNORE INTO payment_methods VALUES (?)', (name,))
+            for table in ('transfer_links','transfer_ignored'):
+                con.execute(f'DELETE FROM {table} WHERE outgoing_id IN (SELECT id FROM transactions WHERE payment_method=?) OR incoming_id IN (SELECT id FROM transactions WHERE payment_method=?)', (name,name))
+            con.execute('DELETE FROM account_settings WHERE payment_method=?', (name,))
+            con.execute('INSERT INTO payment_types VALUES (?,?) ON CONFLICT(name) DO UPDATE SET kind=excluded.kind', (name,kind))
     reconcile_transfers(db)
     return {'ok': True}
 

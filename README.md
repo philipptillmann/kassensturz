@@ -580,3 +580,14 @@ identity. Indistinguishable partial exports need manual review; older generic CS
 imports use different keys. Preview and last-import undo apply normally. EUR only;
 invalid selected-account rows abort atomically, zeros are explicitly excluded.
 Only synthetic fixtures are committed; the supplied CSV is kept out of GitHub.
+
+### Unified payment methods (0.12.0)
+
+Manage cash, bank accounts and PayPal/other methods together under **Zahlungsmittel**.
+Tap an existing method or add one, then choose its type. Bank accounts expose IBAN,
+personal share and income-share settings in the same editor. Existing names and
+transaction/CSV assignments stay intact; configured accounts remain bank accounts,
+Bar defaults to cash, and other existing methods default to PayPal/other. Custom
+types survive backups; older backups infer those same defaults. Changing a bank
+account to another type removes its bank settings/transfer pairings after a warning
+and recalculates effective reports, while retaining all transaction records.

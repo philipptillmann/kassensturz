@@ -69,6 +69,8 @@ def write_archive(source, output, dataset=None):
         def pairs(table):
             return [dict(outgoing=r['outgoing_id'], incoming=r['incoming_id'], **({'manual': r['manual']} if table == 'transfer_links' else {})) for r in con.execute('SELECT * FROM ' + table)]
         meta = dict(format='kassensturz-android', version=1, categories=categories, payments=payments, entries=entries, accounts=accounts, transfers=pairs('transfer_links'), ignored=pairs('transfer_ignored'))
+        if con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='payment_types'").fetchone():
+            meta['payment_types'] = dict(con.execute('SELECT name,kind FROM payment_types'))
         # A renamed server default is still represented by its category alias.
         if con.execute("SELECT 1 FROM category_aliases WHERE alias='Ausgehen'").fetchone():
             meta['category_defaults_version'] = 1

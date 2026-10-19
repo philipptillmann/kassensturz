@@ -18,7 +18,7 @@ async function api(path,data,extraHeaders={}){
 $('dataset').onchange=async()=>{
   if(pending||$('editor').open||$('importDialog').open||$('groupDialog').open){$('dataset').value=dataset;notice('Bitte den aktuellen Vorgang zuerst abschließen oder schließen.');return}
   const previous=dataset;dataset=$('dataset').value;document.querySelector('main').inert=true;
-  try{await refresh();sessionStorage.setItem('kassensturz-dataset',dataset);editing=null;csvText='';$('search').value='';$('csv').value='';render();notice(dataset==='demo'?'Datensatz: Demo.':'Datensatz: Privat.')}catch(e){dataset=previous;$('dataset').value=dataset;notice(e.message)}finally{document.querySelector('main').inert=false}
+  try{await refresh();sessionStorage.setItem('kassensturz-dataset',dataset);editing=null;csvText='';editPayment();$('search').value='';$('csv').value='';render();notice(dataset==='demo'?'Datensatz: Demo.':'Datensatz: Privat.')}catch(e){dataset=previous;$('dataset').value=dataset;notice(e.message)}finally{document.querySelector('main').inert=false}
 };
 
 function notice(s){$('notice').textContent=s}
@@ -34,7 +34,7 @@ $('chart').innerHTML=entries.length?entries.map(([c,n],i)=>`<div class="category
 // Dynamische Breiten per CSSOM, ohne Inline-Skripte.
 document.querySelectorAll('[data-width]').forEach(e=>e.style.width=e.dataset.width+'%');
 $('rows').innerHTML=filtered.map(t=>`<tr data-id="${esc(t.id)}" tabindex="0" role="button" aria-label="${esc(t.merchant)} ${t.members?'anzeigen':'bearbeiten'}"><td><div class="merchant">${esc(t.merchant)}${t.internal_transfer?' <span class="group-tag">Umbuchung</span>':''}${t.has_receipt?' <span class="receipt-indicator" aria-label="Beleg vorhanden">▧</span>':''}</div>${t.personal_share_bp!=null&&t.personal_share_bp!==10000?`<div class="payment-tag">Eigener Anteil: ${t.personal_share_bp/100} %</div>`:''}${t.notes?`<div class="entry-note">${esc(t.notes.length>140?t.notes.slice(0,140)+'…':t.notes)}</div>`:''}${!t.members&&t.payment_method?`<div class="payment-tag">${esc(t.payment_method)}</div>`:''}${t.group_name?`<div class="group-tag">${t.members?`${t.members.length} Buchungen · effektiv`:esc(t.group_name)}</div>`:''}<div class="mobile-category">${t.items.length?`${t.items.length} Positionen`:esc(t.category)}</div></td><td>${t.date.split('-').reverse().join('.')}</td><td><span class="tag">${t.items.length?`${t.items.length} Positionen · aufgeteilt`:esc(t.category)}</span></td><td class="right">${t.kind==='income'?'＋'+euro(-t.amount):euro(t.amount)}</td></tr>`).join('');
-$('empty').hidden=filtered.length>0;$('count').textContent=all.length;$('categories').innerHTML=state.categories.map(c=>`<button type="button" data-category="${esc(c)}" aria-label="${esc(c)} umbenennen">${esc(c)} <span aria-hidden="true">✎</span></button>`).join('');$('categories').querySelectorAll('[data-category]').forEach(button=>button.onclick=()=>renameCategory(button.dataset.category));$('paymentMethods').innerHTML=(state.payment_methods||[]).map(name=>`<span>${esc(name)}</span>`).join('');
+$('empty').hidden=filtered.length>0;$('count').textContent=all.length;$('categories').innerHTML=state.categories.map(c=>`<button type="button" data-category="${esc(c)}" aria-label="${esc(c)} umbenennen">${esc(c)} <span aria-hidden="true">✎</span></button>`).join('');$('categories').querySelectorAll('[data-category]').forEach(button=>button.onclick=()=>renameCategory(button.dataset.category));
 renderAccounts();renderGraphs();
 $('rows').querySelectorAll('tr').forEach(row=>{row.onclick=()=>{const tx=all.find(t=>String(t.id)===row.dataset.id);if(tx.members)openGroup(tx);else openEditor(state.transactions.find(original=>original.id===(tx.source_id??tx.id)))};row.onkeydown=e=>{if(e.key==='Enter')row.click()}})
 }
@@ -140,7 +140,11 @@ $('closeGroup').onclick=()=>$('groupDialog').close();
 
 function paymentOptions(selected=''){return '<option value="">Nicht angegeben</option>'+(state.payment_methods||[]).map(name=>`<option value="${esc(name)}" ${name===selected?'selected':''}>${esc(name)}</option>`).join('')}
 async function renameCategory(oldName){const name=prompt('Neuer Kategoriename:',oldName);if(name===null||name.trim()===oldName)return;try{await api('category-rename',{old_name:oldName,name});await refresh();notice('Kategorie und gespeicherte Zuordnungen aktualisiert.')}catch(e){notice(e.message)}}
-$('paymentForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await api('payment-method',{name:$('paymentName').value});$('paymentName').value='';await refresh();notice('Zahlungsmittel hinzugefügt.')}catch(e){notice(e.message)}finally{button.disabled=false}};
+function paymentFields(){const bank=$('paymentKind').value==='bank';$('bankFields').hidden=!bank;$('bankFields').disabled=!bank}
+function editPayment(name=''){const entry=(state.payment_details||[]).find(p=>p.name===name);const bank=(state.accounts||[]).find(a=>a.payment_method===name);$('paymentName').value=name;$('paymentName').readOnly=!!name;$('paymentKind').value=entry?.kind||'other';$('accountIban').value=bank?.iban||'';$('accountShare').value=bank?bank.share_bp/100:100;$('accountIncome').checked=bank?!!bank.share_income:true;paymentFields()}
+$('paymentKind').onchange=paymentFields;$('newPayment').onclick=()=>editPayment();
+$('paymentForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;const name=$('paymentName').value;const kind=$('paymentKind').value;if(kind!=='bank'&&(state.accounts||[]).some(a=>a.payment_method===name)&&!confirm('Bankkonto in ein anderes Zahlungsmittel umwandeln? IBAN, Kontoanteil und zugehörige Umbuchungszuordnungen werden entfernt. Dies wirkt auch auf bisherige Auswertungen. Buchungen bleiben erhalten.'))return;button.disabled=true;try{const data={name,kind};if(kind==='bank')Object.assign(data,{iban:$('accountIban').value,share_percent:$('accountShare').value,share_income:$('accountIncome').checked});await api('payment',data);await refresh();editPayment(name);notice('Zahlungsmittel gespeichert.')}catch(e){notice(e.message)}finally{button.disabled=false}};
+
 
 function updateIncomeForm(){const income=$('transactionKind').value==='income';$('amountHint').textContent=income?'Einnahmen als positiven Betrag eingeben.':'Geld zurückbekommen? Mit +/− den Betrag als Erstattung oder Beitrag negativ setzen.';$('amountSign').hidden=income;document.querySelectorAll('.item-sign').forEach(button=>button.hidden=income)}
 $('transactionKind').onchange=()=>{if($('transactionKind').value==='income'){if($('amount').value)$('amount').value=(Math.abs(parseAmount($('amount').value))/100).toFixed(2);document.querySelectorAll('.itemamount').forEach(input=>{if(input.value)input.value=(Math.abs(parseAmount(input.value))/100).toFixed(2)})}updateIncomeForm();balance()};
@@ -150,9 +154,9 @@ $('receiptLink').onclick=e=>{e.preventDefault();$('receiptPreview').src=$('recei
 $('removeReceipt').onclick=()=>{receiptImage=null;removeReceipt=true;$('photo').value='';$('receiptPreview').hidden=true;$('receiptPreview').removeAttribute('src');$('receiptLink').hidden=true;$('removeReceipt').hidden=true;$('receiptStatus').textContent='Beleg wird beim Speichern entfernt.'};
 
 function renderAccounts(){
-  $('paymentNames').innerHTML=(state.payment_methods||[]).map(name=>`<option value="${esc(name)}"></option>`).join('');
-  $('accountList').innerHTML=(state.accounts||[]).map(account=>`<button type="button" class="account-row" data-account="${esc(account.payment_method)}">${esc(account.payment_method)} · ${account.share_bp/100} % <span aria-hidden="true">✎</span></button>`).join('')||'<p class="muted">Noch keine eigenen Konten konfiguriert.</p>';
-  $('accountList').querySelectorAll('[data-account]').forEach(button=>button.onclick=()=>{const account=state.accounts.find(a=>a.payment_method===button.dataset.account);$('accountName').value=account.payment_method;$('accountIban').value=account.iban;$('accountShare').value=account.share_bp/100;$('accountIncome').checked=Boolean(account.share_income)});
+  $('paymentMethods').innerHTML=(state.payment_details||[]).map(p=>`<button type="button" data-payment="${esc(p.name)}">${esc(p.name)} · ${{cash:'Bargeld',bank:'Bankkonto',other:'PayPal / Sonstiges'}[p.kind]} <span aria-hidden="true">✎</span></button>`).join('');
+  $('paymentMethods').querySelectorAll('[data-payment]').forEach(button=>button.onclick=()=>editPayment(button.dataset.payment));
+  paymentFields();
   const describe=id=>{const tx=state.transactions.find(t=>t.id===id);return tx?`${tx.payment_method}: ${tx.merchant} · ${tx.date} · ${euro(tx.amount)}`:''};
   const confirmed=(state.transfer_links||[]).map(pair=>`<div class="transfer-row"><b>Bestätigte Umbuchung</b><p>${esc(describe(pair.outgoing_id))}<br>${esc(describe(pair.incoming_id))}</p><button data-out="${pair.outgoing_id}" data-in="${pair.incoming_id}" data-action="transfer-reject">Als normale Buchungen behandeln</button></div>`);
   const candidates=(state.transfer_candidates||[]).map(pair=>`<div class="transfer-row"><b>Mögliche Umbuchung</b><p>${esc(describe(pair.outgoing_id))}<br>${esc(describe(pair.incoming_id))}</p><button data-out="${pair.outgoing_id}" data-in="${pair.incoming_id}" data-action="transfer-confirm">Gegenbuchungen bestätigen</button> <button data-out="${pair.outgoing_id}" data-in="${pair.incoming_id}" data-action="transfer-reject">Kein Zusammenhang</button></div>`);
@@ -160,7 +164,7 @@ function renderAccounts(){
   $('transferList').innerHTML=confirmed.concat(candidates,rejected).join('')||'<p class="muted">Keine passenden Gegenbuchungen.</p>';
   $('transferList').querySelectorAll('[data-action]').forEach(button=>button.onclick=async()=>{button.disabled=true;try{await api(button.dataset.action,{outgoing_id:Number(button.dataset.out),incoming_id:Number(button.dataset.in)});await refresh()}catch(e){notice(e.message);button.disabled=false}});
 }
-$('accountForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;button.disabled=true;try{await api('account',{name:$('accountName').value,iban:$('accountIban').value,share_percent:$('accountShare').value,share_income:$('accountIncome').checked});await refresh();notice('Kontoeinstellungen gespeichert.')}catch(e){notice(e.message)}finally{button.disabled=false}};
+
 
 
 $('backupFile').onchange=async()=>{
