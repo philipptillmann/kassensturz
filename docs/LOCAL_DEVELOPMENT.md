@@ -111,8 +111,9 @@ These are instructions for the developer; no hosted workflow is started.
 
 Merge future `server` changes into `local`, retaining the local launcher and
 configuration. Keep application and calculation code aligned with `server`.
-This synchronization retains VERSION 0.13.0; it adds development configuration
-without publishing a new server or Android app release.
+The initial synchronization retained VERSION 0.13.0. Later feature releases,
+including the wealth overview in 0.14.0, use the shared root VERSION as usual.
+See [wealth overview](WEALTH.md) for the new functionality and its checks.
 
 ### Verification of this synchronization
 
