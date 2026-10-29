@@ -7,7 +7,7 @@ import app as ledger
 
 def prepare_demo(db):
     ledger.init(db)
-    samples = json.loads((ledger.ROOT / 'sample-data' / 'demo.json').read_text())
+    samples = json.loads((ledger.ROOT / 'sample-data' / 'demo.json').read_text(encoding='utf-8'))
     today = datetime.date.today()
     with ledger.connect(db) as con:
         con.execute('CREATE TABLE IF NOT EXISTS dataset_meta(key TEXT PRIMARY KEY)')
