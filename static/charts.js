@@ -9,6 +9,7 @@
     return Array.from({length:end-start+1},(_,i)=>`${Math.floor((start+i)/12)}-${String((start+i)%12+1).padStart(2,'0')}`);
   }
   function personalView(transactions,accounts=[],effective=false){
+    transactions=transactions.filter(tx=>!tx.wealth_transfer);
     if(!effective)return transactions;
     const settings=new Map(accounts.map(account=>[account.payment_method,account]));
     const round=n=>Math.sign(n)*Math.round(Math.abs(n)/10000);
@@ -53,6 +54,7 @@
     const months=monthsBetween(from,to),monthly=new Map(months.map(m=>[m,0])),categories=new Map(),merchants=new Map(),series=new Map();
     let expenses=0,credits=0,income=0;
     for(const tx of transactions){
+      if(tx.wealth_transfer)continue;
       const month=tx.date.slice(0,7);if(!monthly.has(month))continue;
       for(const item of tx.items.length?tx.items:[tx]){
         if(category&&item.category!==category)continue;

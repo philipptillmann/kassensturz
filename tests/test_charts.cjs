@@ -81,3 +81,9 @@ assert.equal(personalView(sharedTx,[{...sharedAccounts[0],share_income:0}],true)
 const tiny={id:94,date:'2026-10-01',payment_method:'Shared',amount:10,items:Array.from({length:10},()=>({amount:1,category:'Shopping'}))};
 const rounded=personalView([tiny],sharedAccounts,true)[0];assert.equal(rounded.amount,5);assert.equal(rounded.items.reduce((n,i)=>n+i.amount,0),5);assert(rounded.items.every(i=>i.amount>=0));
 console.log('Account reporting checks passed: shared expenses/income, rounding, transfer exclusion across months, and unchanged original amounts.');
+const investment={id:200,date:'2026-10-01',merchant:'Depot',amount:100000,category:'Shopping',items:[],wealth_transfer:true};
+assert.equal(monthView([investment],'2026-10',false).length,0);
+assert.equal(monthView([investment],'2026-10',true).length,0);
+assert.equal(aggregate([investment],{from:'2026-10',to:'2026-10'}).expenses,0);
+assert.equal(personalView([investment],[],false).length,0);
+console.log('Wealth transfers excluded from both reporting modes and charts.');

@@ -176,3 +176,9 @@ textarea{font:inherit;min-width:0;width:100%;border:1px solid #cfd7cc;border-rad
 #bankFields{grid-column:1/-1;min-width:0;border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:14px}
 #bankFields legend{padding:0 6px}
 #bankFields label{min-width:0}
+.wealth-total{display:block;font-size:2rem;color:var(--accent);margin:12px 0}
+#wealth .actions{flex-wrap:wrap}
+#wealthPlans{display:flex;flex-wrap:wrap;gap:8px}
+#wealthForecastResult svg{display:block;width:100%;height:auto;max-height:300px;margin:16px 0}
+.wealth-line{fill:none;stroke-width:3}
+.wealth-line-0{stroke:#a16b27}.wealth-line-1{stroke:#254f43}.wealth-line-2{stroke:#587dc2}

@@ -2,6 +2,7 @@
 !Dockerfile
 !requirements.txt
 !app.py
+!wealth.py
 !server.py
 !receipts.py
 !bank_providers.py
