@@ -1,3 +1,3 @@
 #!/bin/zsh
 cd "${0:A:h}"
-docker compose up -d --build
+exec .venv/bin/python run_local.py

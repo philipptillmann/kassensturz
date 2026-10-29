@@ -1,8 +1,8 @@
-# Kassensturz — Server
+# Kassensturz — Local development
 
 Ausgaben, Kategorien und aufgeteilte Rechnungen in einer gemeinsamen Web-App. Laptop und Handy greifen auf dieselbe SQLite-Datenbank zu. Installation mit Docker Compose auf einem NAS, Heimserver, VPS oder Mac mit Docker Desktop.
 
-Der Branch `local` enthält weiterhin die ursprüngliche Mac-Version. Dieser Branch `server` verwendet Flask und Waitress sowie Tesseract statt Apple Vision. Alle angemeldeten Geräte teilen **ein Haushaltskonto**; es gibt keine getrennten Benutzer oder Berechtigungsstufen.
+Branch local now contains the current server web app. Start here: [Local development setup for Windows, macOS and Linux](docs/LOCAL_DEVELOPMENT.md). The following sections describe the inherited server features and production deployment; use the local guide to run on localhost.
 
 ## Installation im privaten Netzwerk
 
