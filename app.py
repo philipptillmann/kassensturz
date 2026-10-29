@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import csv, datetime, hashlib, io, json, os, re, sqlite3, secrets
-from contextlib import nullcontext
+from contextlib import nullcontext, closing
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -17,11 +17,12 @@ def connect(db=None):
 def init(db=None):
     db = DB if db is None else Path(db)
     db.parent.mkdir(parents=True, exist_ok=True)
-    with connect(db) as c:
+    with closing(connect(db)) as c, c:
         c.execute('PRAGMA journal_mode=WAL')
         c.executescript('''
         CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, csrf TEXT NOT NULL, expires INTEGER NOT NULL, auth_version TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS categories(name TEXT PRIMARY KEY);
+        CREATE TABLE IF NOT EXISTS wealth_state(id INTEGER PRIMARY KEY CHECK(id=1),data TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS category_aliases(alias TEXT PRIMARY KEY, name TEXT NOT NULL REFERENCES categories(name));
         CREATE TABLE IF NOT EXISTS payment_methods(name TEXT PRIMARY KEY);
         CREATE TABLE IF NOT EXISTS payment_types(name TEXT PRIMARY KEY REFERENCES payment_methods(name) ON DELETE CASCADE, kind TEXT NOT NULL CHECK(kind IN ('cash','other')));
@@ -366,6 +367,10 @@ def revert_csv_import(token, db=None):
         row = c.execute('SELECT token FROM csv_undo WHERE id=1').fetchone()
         if not isinstance(token, str) or not row or not secrets.compare_digest(row['token'], token):
             raise ValueError('CSV-Import hat sich geändert oder wurde bereits rückgängig gemacht. Bitte erneut prüfen.')
+        import wealth
+        linked = wealth.linked_entries(wealth.load(c))
+        if any(row[0] in linked for row in c.execute('SELECT transaction_id FROM csv_undo_entries')):
+            raise ValueError('Zuerst Bankzuordnungen dieses Imports im Vermögensjournal aufheben.')
         count = c.execute('DELETE FROM transactions WHERE id IN (SELECT transaction_id FROM csv_undo_entries)').rowcount
         c.execute('DELETE FROM csv_undo_entries')
         c.execute('DELETE FROM csv_undo')

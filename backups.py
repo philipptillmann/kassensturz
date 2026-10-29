@@ -11,13 +11,14 @@ import zipfile
 import app as ledger
 import accounts
 import shortcut_api
+import wealth
 from tools.export_android import write_archive
 
 MAX_ARCHIVE_BYTES = 544_000_000
 MAX_METADATA = 16_000_000
 MAX_RECEIPT = 4_000_000
 MAX_RECEIPTS = 512_000_000
-TABLES = ('shortcut_imports', 'transfer_ignored', 'transfer_links', 'receipt_images', 'items',
+TABLES = ('wealth_state', 'shortcut_imports', 'transfer_ignored', 'transfer_links', 'receipt_images', 'items',
           'transactions', 'account_settings', 'payment_types', 'category_aliases', 'payment_methods', 'categories')
 
 
@@ -56,7 +57,7 @@ def bounded_read(stream, maximum):
 
 
 def _insert_metadata(meta, con):
-    if not isinstance(meta, dict) or meta.get('format') != 'kassensturz-android' or type(meta.get('version')) is not int or meta['version'] != 1:
+    if not isinstance(meta, dict) or meta.get('format') != 'kassensturz-android' or type(meta.get('version')) is not int or meta['version'] not in (1, 2):
         raise ValueError('Unbekanntes Kassensturz-Sicherungsformat.')
     cats, payments = names(meta['categories']), names(meta['payments'])
     if not cats:
@@ -176,6 +177,19 @@ def _insert_metadata(meta, con):
         if identity != expected_id or txid is not None and integer(txid, 1) not in entries:
             raise ValueError('Ungültige Kurzbefehlsquelle.')
         con.execute('INSERT INTO shortcut_imports VALUES (?,?,?,?)', (identity,txid,payload,text(source['created_at'],100,False)))
+    doc = wealth.validate(meta.get('wealth', wealth.empty()))
+    if not wealth.linked_entries(doc).issubset(entries):
+        raise ValueError('Vermögensumbuchung verweist auf fehlende Bankbuchung.')
+    for event in doc['events']:
+        signs = []
+        for identity in event['entries']:
+            row = con.execute('SELECT * FROM transactions WHERE id=?', (identity,)).fetchone()
+            if row['kind'] != 'expense' or abs(row['amount']) != event['amount'] or row['group_name'] or con.execute('SELECT 1 FROM items WHERE transaction_id=?', (identity,)).fetchone():
+                raise ValueError('Ungültige Bankzuordnung im Vermögensjournal.')
+            signs.append(row['amount'] > 0)
+        if len(signs) == 2 and signs[0] == signs[1]:
+            raise ValueError('Ungültige Gegenbuchungen im Vermögensjournal.')
+    wealth.store(con, doc)
     return receipts, {'entries': len(rows), 'receipts': len(receipts), 'categories': len(cats),
                       'dataset': text(meta.get('dataset','unknown'), 20),
                       'created_at': text(meta.get('created_at',''), 100)}

@@ -1,4 +1,5 @@
 import io
+import gc
 import json
 from pathlib import Path
 import tempfile
@@ -27,6 +28,9 @@ class BackupTests(unittest.TestCase):
         app.rename_category('Shopping', 'Einkäufe', self.db)
 
     def tearDown(self):
+        # sqlite3 transaction contexts do not close connections. Collect the
+        # fixture's released handles before Windows removes its temporary DBs.
+        gc.collect()
         self.tmp.cleanup()
 
     def snapshot(self):

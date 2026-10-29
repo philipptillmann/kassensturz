@@ -15,7 +15,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt VERSION ./
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py backups.py shortcut_api.py ./
+COPY app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py backups.py shortcut_api.py wealth.py ./
 COPY sample-data ./sample-data
 COPY static ./static
 COPY tests ./tests

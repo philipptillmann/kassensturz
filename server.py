@@ -23,6 +23,7 @@ import accounts
 import backups
 import shortcut_api
 import users
+import wealth
 from datasets import prepare_demo
 from receipts import OCRBusy
 
@@ -340,6 +341,7 @@ def create_app(password=None, public_url=None):
 
     @web.get('/app.js')
     @web.get('/charts.js')
+    @web.get('/wealth.js')
     def javascript():
         return send_from_directory(ledger.ROOT / 'static', request.path[1:])
 
@@ -348,6 +350,10 @@ def create_app(password=None, public_url=None):
         accounts.reconcile_transfers(g.dataset_paths[g.dataset])
         with data_connect() as con:
             transactions = [dict(x) for x in con.execute('SELECT transactions.*, EXISTS(SELECT 1 FROM receipt_images WHERE transaction_id=transactions.id) AS has_receipt, EXISTS(SELECT 1 FROM shortcut_imports WHERE transaction_id=transactions.id) AS has_shortcut_source FROM transactions ORDER BY date DESC,id DESC')]
+            wealth_doc = wealth.load(con)
+            wealth_ids = wealth.linked_entries(wealth_doc)
+            for tx in transactions:
+                tx['wealth_transfer'] = tx['id'] in wealth_ids
             all_items = {}
             for item in con.execute('SELECT * FROM items ORDER BY id'):
                 all_items.setdefault(item['transaction_id'], []).append(dict(item))
@@ -363,7 +369,7 @@ def create_app(password=None, public_url=None):
             candidates = [pair for pair in accounts.candidate_pairs(con) if pair['outgoing_id'] not in linked and pair['incoming_id'] not in linked]
             for transaction in transactions:
                 transaction['internal_transfer'] = transaction['id'] in linked
-        return jsonify(transactions=transactions, categories=categories, payment_methods=payments, payment_details=accounts.payment_details(g.dataset_paths[g.dataset]), default_category=default_category, accounts=account_settings, transfer_links=links, transfer_candidates=candidates, transfer_rejected=rejected, dataset=g.dataset)
+        return jsonify(transactions=transactions, wealth=wealth_doc, categories=categories, payment_methods=payments, payment_details=accounts.payment_details(g.dataset_paths[g.dataset]), default_category=default_category, accounts=account_settings, transfer_links=links, transfer_candidates=candidates, transfer_rejected=rejected, dataset=g.dataset)
 
     @web.get('/api/receipt/<int:transaction_id>')
     def receipt_image(transaction_id):
@@ -424,6 +430,7 @@ def create_app(password=None, public_url=None):
         def safe(value):
             return "'" + value if value.startswith(('=', '+', '-', '@', '\t', '\r')) else value
         with data_connect() as con:
+            wealth_ids = wealth.linked_entries(wealth.load(con))
             for transaction in con.execute('SELECT * FROM transactions ORDER BY date DESC'):
                 items = list(con.execute('SELECT * FROM items WHERE transaction_id=? ORDER BY id', (transaction['id'],)))
                 for item in items or [transaction]:
@@ -431,7 +438,7 @@ def create_app(password=None, public_url=None):
                                      f"{item['amount'] / 100:.2f}".replace('.', ','), safe(item['category']),
                                      safe(item['name']) if items else '',
                                      safe(transaction['group_name'] if not items or item['group_name'] is None else item['group_name']), safe(transaction['payment_method']),
-                                     'Einnahme' if transaction['kind'] == 'income' else 'Ausgabe / Erstattung', safe(transaction['notes'])])
+                                     'Vermögensumbuchung' if transaction['id'] in wealth_ids else 'Einnahme' if transaction['kind'] == 'income' else 'Ausgabe / Erstattung', safe(transaction['notes'])])
         response = make_response(('\ufeff' + out.getvalue()).encode())
         response.headers['Content-Type'] = 'text/csv; charset=utf-8'
         response.headers['Content-Disposition'] = f'attachment; filename=kassensturz-{g.dataset}.csv'
@@ -442,7 +449,23 @@ def create_app(password=None, public_url=None):
         data = request.get_json()
         if not isinstance(data, dict):
             return failure('JSON-Objekt erwartet.')
-        if action == 'transaction':
+        if action == 'wealth':
+            result = wealth.update(g.dataset_paths[g.dataset], data)
+        elif action == 'wealth-quote':
+            result = wealth.quote_update(g.dataset_paths[g.dataset], data)
+        elif action == 'wealth-report':
+            with data_connect() as con:
+                result = wealth.report(wealth.load(con), wealth.integer(data.get('months', 120), 1, 360))
+        elif action == 'wealth-due':
+            with data_connect() as con:
+                doc = wealth.load(con)
+            booked = {(e['plan'], e['date']) for e in doc['events']}
+            result = {'due': sorted([dict(date=date, name=p['name'], amount=p['amount']) for p in doc['plans'] if p['enabled'] for date in wealth.occurrences(p, '0001-01-01', datetime.date.today().isoformat()) if (p['id'], date) not in booked], key=lambda p: (p['date'], p['name']))}
+        elif action == 'transaction':
+            if data.get('id'):
+                with data_connect() as con:
+                    if int(data['id']) in wealth.linked_entries(wealth.load(con)):
+                        return failure('Zuerst die Bankzuordnung im Vermögensjournal aufheben.')
             result = ledger.save_transaction(data, db=g.dataset_paths[g.dataset])
         elif action == 'import-preview':
             columns, rows = ledger.read_csv(data['text'])
@@ -492,6 +515,8 @@ def create_app(password=None, public_url=None):
             result = {'ok': True}
         elif action == 'delete':
             with data_connect() as con:
+                if int(data['id']) in wealth.linked_entries(wealth.load(con)):
+                    return failure('Zuerst die Bankzuordnung im Vermögensjournal aufheben.')
                 con.execute('DELETE FROM transactions WHERE id=?', (int(data['id']),))
             result = {'ok': True}
         else:

@@ -4,6 +4,13 @@ Ausgaben, Kategorien und aufgeteilte Rechnungen in einer gemeinsamen Web-App. La
 
 Der Branch `local` enthält weiterhin die ursprüngliche Mac-Version. Dieser Branch `server` verwendet Flask und Waitress sowie Tesseract statt Apple Vision. Alle angemeldeten Geräte teilen **ein Haushaltskonto**; es gibt keine getrennten Benutzer oder Berechtigungsstufen.
 
+## Vermögensübersicht (0.14.0)
+
+Unter **Vermögen** Guthaben, Depots, Bausparen, Festgeld und Tagesgeld verwalten.
+Umbuchungen und Sparpläne zählen getrennt von Ausgaben; Prognosen berücksichtigen
+Zinsen, Laufzeiten und verfügbare Quellguthaben. Optionaler Börsenkursabruf mit
+eigenem kostenlosen API-Schlüssel. [Bedienung und Rechenregeln](docs/WEALTH.md).
+
 ## Installation im privaten Netzwerk
 
 Voraussetzung: Docker Engine mit Compose v2 oder Docker Desktop. Der Rechner mit Docker muss eingeschaltet bleiben.

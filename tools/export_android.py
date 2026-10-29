@@ -80,6 +80,12 @@ def write_archive(source, output, dataset=None):
             if count > 50000 or size > 16_000_000:
                 raise ValueError('Shortcut history exceeds the portable backup limits.')
             meta['server_shortcut_imports'] = [dict(r) for r in con.execute('SELECT * FROM shortcut_imports ORDER BY request_id')]
+        if con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='wealth_state'").fetchone():
+            row = con.execute('SELECT data FROM wealth_state WHERE id=1').fetchone()
+            if row:
+                meta['wealth'] = json.loads(row[0])
+                if meta['wealth']['assets']:
+                    meta['version'] = 2
         meta['created_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         if dataset is not None:
             meta['dataset'] = dataset
