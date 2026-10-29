@@ -16,7 +16,7 @@ class DemoUpgradeTests(unittest.TestCase):
             ledger.init(private)
             ledger.save_transaction({'date': '2026-01-01', 'merchant': 'Private purchase',
                                      'amount': '42', 'category': 'Shopping'}, db=private)
-            samples = json.loads((ledger.ROOT / 'sample-data/demo.json').read_text())
+            samples = json.loads((ledger.ROOT / 'sample-data/demo.json').read_text(encoding='utf-8'))
             original = [sample for sample in samples if not sample.get('seed_group')]
             with patch('datasets.json.loads', return_value=original):
                 prepare_demo(demo)
