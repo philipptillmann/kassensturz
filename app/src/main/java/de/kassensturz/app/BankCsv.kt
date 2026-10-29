@@ -154,7 +154,7 @@ object BankCsv {
         fun cell(value: String) = "\""+value.replace("\"","\"\"")+"\""
         val header=listOf("Datum","Bezeichnung","Betrag","Kategorie","Zahlungsmittel","Art","Gruppe","Notizen","Position","Positionsbetrag","Positionskategorie","Positionsgruppe")
         return "\uFEFF"+(listOf(header)+entries.flatMap { e ->
-            val base=listOf(e.date,e.merchant,java.math.BigDecimal(e.amount).movePointLeft(2).toPlainString().replace('.',','),e.category,e.payment,e.kind,e.group,e.notes)
+            val base=listOf(e.date,e.merchant,java.math.BigDecimal(e.amount).movePointLeft(2).toPlainString().replace('.',','),e.category,e.payment,if(e.wealthTransfer)"wealth_transfer" else e.kind,e.group,e.notes)
             if(e.parts.isEmpty()) listOf(base+listOf("","","","")) else e.parts.map { p -> base+listOf(p.name,java.math.BigDecimal(p.amount).movePointLeft(2).toPlainString().replace('.',','),p.category,p.group ?: "(geerbt)") }
         }).joinToString("\r\n") { row -> row.joinToString(";") { cell(it) } }
     }

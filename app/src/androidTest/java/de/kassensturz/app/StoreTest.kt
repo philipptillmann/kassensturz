@@ -33,6 +33,22 @@ class StoreTest {
         db=Store(isolated,false)
     }
     @After fun tearDown() { db.close();folder.deleteRecursively() }
+    @Test fun wealthSurvivesBackupAndBankLinksAreNotExpenses() {
+        val today=java.time.LocalDate.now().toString()
+        listOf("Giro" to 100000L,"Depot" to 0L).forEach { (name,value) ->
+            db.wealthCommand(org.json.JSONObject().put("op","asset").put("name",name).put("type",if(name=="Depot")"brokerage" else "cash").put("value",value).put("date",today).put("rate_bp",0).put("maturity",""))
+        }
+        val id=db.save(Entry(date=today,merchant="Depottransfer",amount=5000,category="Shopping"))
+        db.wealthCommand(org.json.JSONObject().put("op","event").put("kind","transfer").put("amount",5000).put("from",1).put("to",2).put("date",today))
+        db.wealthCommand(org.json.JSONObject().put("op","link").put("id",1).put("entries",org.json.JSONArray().put(id)))
+        assertTrue(db.snapshot().entries.single { it.id==id }.wealthTransfer)
+        assertTrue(Ledger.rows(db.snapshot().entries,null,false).isEmpty())
+        val expected=db.snapshot().wealth.toString();val output=ByteArrayOutputStream();db.backup(output)
+        db.restore(ByteArrayInputStream(output.toByteArray()))
+        assertEquals(expected,db.snapshot().wealth.toString())
+        assertTrue(db.snapshot().entries.single { it.id==id }.wealthTransfer)
+        try { db.delete(id);fail("Linked bank entry deleted") } catch(expected:IllegalArgumentException) { }
+    }
     private fun entry()=Entry(date="2026-10-01",merchant="Gift",amount=5000,category="Shopping",payment="Bankkarte",group="Gift",notes="Keep me",parts=listOf(Part("A",3000,"Shopping","Gift"),Part("B",2000,"Freizeit","")))
     @Test fun testUnifiedPaymentTypesBankConversionAndBackup() {
         db.configurePayment("Pocket cash","cash")

@@ -28,6 +28,8 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.Executors
+import org.json.JSONObject
+import org.json.JSONArray
 
 class MainActivity : Activity() {
     private val green=Color.rgb(37,79,67)
@@ -129,9 +131,9 @@ class MainActivity : Activity() {
             }.show()
         }
         val nav=row(root)
-        listOf("Übersicht","Diagramme","Buchungen","Mehr").forEachIndexed { i,name -> button(nav,name) { tab=i;screen() }.apply { textSize=12f;minWidth=0;setPadding(0,0,0,0);layoutParams=LinearLayout.LayoutParams(0,dp(48),1f);if(tab==i)setTypeface(null,Typeface.BOLD) } }
+        listOf("Übersicht","Diagramme","Buchungen","Vermögen","Mehr").forEachIndexed { i,name -> button(nav,name) { tab=i;screen() }.apply { textSize=11f;minWidth=0;setPadding(0,0,0,0);layoutParams=LinearLayout.LayoutParams(0,dp(48),1f);if(tab==i)setTypeface(null,Typeface.BOLD) } }
         val scroll=ScrollView(this);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f));content=column();scroll.addView(content)
-        if(tab!=3) {
+        if(tab<3) {
             val period=row(content)
             button(period,"‹") { month=month.minusMonths(1);screen() }.layoutParams=LinearLayout.LayoutParams(dp(48),-2)
             button(period,month.format(DateTimeFormatter.ofPattern("MMMM yyyy",Locale.GERMAN))) {
@@ -140,8 +142,133 @@ class MainActivity : Activity() {
             button(period,"›") { month=month.plusMonths(1);screen() }.layoutParams=LinearLayout.LayoutParams(dp(48),-2)
             check(content,"Effektive Kosten",effective).setOnCheckedChangeListener { _,value -> effective=value;screen() }
         }
-        when(tab) { 0->overview();1->graphs();2->transactions();else->settings() }
-        if(tab!=3) button(root,"+ Buchung") { edit(null) }
+        when(tab) { 0->overview();1->graphs();2->transactions();3->wealthScreen();else->settings() }
+        if(tab<3) button(root,"+ Buchung") { edit(null) }
+    }
+    private fun wealthScreen() {
+        val doc=data.wealth;val summary=box(content)
+        label(summary,"Vermögensübersicht",22f,true);label(summary,money(Wealth.total(doc)),30f,true,green)
+        label(summary,"Erfasste Bestände in EUR · ${LocalDate.now()}. Giroguthaben separat erfassen; die Buchungsliste ist kein Kontostand. Umbuchungen sind keine Ausgaben oder Einnahmen.",14f,color=muted)
+        button(summary,"Vermögenswert anlegen") { wealthAssetDialog() }
+        button(summary,"Bewegung erfassen") { wealthEventDialog() }
+        button(summary,"Dauerauftrag anlegen") { wealthPlanDialog() }
+        button(summary,"Fällige Daueraufträge buchen") {
+            val booked=Wealth.events(doc).map { it.num("plan") to it.getString("date") }.toSet()
+            val due=Wealth.plans(doc).filter { it.getBoolean("enabled") }.flatMap { p -> Wealth.dates(p,"0001-01-01",LocalDate.now().toString()).filter { (p.num("id") to it) !in booked }.map { "$it · ${p.getString("name")} · ${money(p.num("amount"))}" } }
+            confirm("${due.size} fällige Termine buchen?",due.take(30).joinToString("\n")+"\nBei unzureichendem Quellguthaben wird nichts gebucht. Bereits gebuchte Termine werden nicht wiederholt. Importierte Bankbuchungen anschließend im Vermögensjournal zuordnen.") {
+                change({store.wealthCommand(JSONObject().put("op","run-plans"))})
+            }
+        }
+        Wealth.assets(doc).forEach { a ->
+            val card=box(content);label(card,a.getString("name"),20f,true)
+            label(card,"${Wealth.types[a.getString("type")]} · ${Wealth.decimal(a.num("rate_bp"))} % p. a."+(a.getString("maturity").takeIf { it.isNotEmpty() }?.let { " · bis $it" } ?: ""),14f)
+            label(card,money(Wealth.cash(doc,a)+Wealth.holdings(a)),24f,true,green)
+            label(card,"Guthaben ${money(Wealth.cash(doc,a))} · Positionen ${money(Wealth.holdings(a))}",14f)
+            label(card,"Letzter Bestandswert: ${a.getJSONArray("snapshots").rows().maxOf { it.getString("date") }}",13f,color=muted)
+            button(card,"Produkt / Bestandswert bearbeiten") { wealthAssetDialog(a) }
+            button(card,"Anlage entfernen") { confirm("Anlage entfernen?","Nur ohne Bewegungen oder Daueraufträge möglich.") { change({store.wealthCommand(JSONObject().put("op","delete-asset").put("id",a.num("id")))}) } }
+            if(a.getString("type")=="brokerage") {
+                button(card,"Wertpapierbestand erfassen") { wealthPositionDialog(a) }
+                button(card,"Wertpapier kaufen / verkaufen") { wealthPositionDialog(a,null,true) }
+                a.getJSONArray("positions").rows().forEach { p ->
+                    label(card,"${p.getString("name")} · ${Wealth.decimal(p.num("units"),6)} Stück × ${Wealth.decimal(p.num("price"),6)} EUR\nKursdatum ${p.getString("date")} · ${p.getString("symbol")}",14f)
+                    button(card,"${p.getString("name")}: Bestand / Kurs") { wealthPositionDialog(a,p) }
+                    button(card,"${p.getString("name")}: Handeln") { wealthPositionDialog(a,p,true) }
+                    if(p.getString("symbol").isNotEmpty()) button(card,"${p.getString("name")}: Kurs aktualisieren") { wealthQuoteDialog(a,p) }
+                    if(p.num("units")==0L) button(card,"Leere Position entfernen") { change({store.wealthCommand(JSONObject().put("op","delete-position").put("id",a.num("id")).put("name",p.getString("name")))}) }
+                }
+            }
+        }
+        val plans=box(content);label(plans,"Daueraufträge",20f,true)
+        Wealth.plans(doc).forEach { p -> button(plans,"${p.getString("name")} · ${money(p.num("amount"))} · ${if(p.getBoolean("enabled")) "aktiv" else "pausiert"}") { wealthPlanDialog(p) } }
+        val projection=box(content);label(projection,"Mögliche Wertentwicklung",20f,true)
+        val years=select(projection,"Zeitraum",listOf("1 Jahr","5 Jahre","10 Jahre","20 Jahre","30 Jahre"),"10 Jahre")
+        label(projection,"Modellrechnung: Jahresrate nominal, tagweise ACT/365, Gutschrift zum Monatsende. Depot-Szenarien ±2 Prozentpunkte. Ohne Steuern, Inflation, automatische Dividenden oder künftige Gehaltseingänge. Nach Laufzeitende unverzinst. Interne Umbuchungen erhöhen das Gesamtvermögen nicht.",14f,color=muted)
+        button(projection,"Prognose berechnen") {
+            val months=listOf(12,60,120,240,360)[years.selectedItemPosition]
+            work({listOf(-200,0,200).map { Wealth.forecast(doc,months,it) }}) { results ->
+                val f=form()
+                listOf("Vorsichtig","Annahme","Optimistisch").forEachIndexed { i,title ->
+                    val result=results[i];label(f,title,20f,true);label(f,money(result.points.last().total),24f,true,green)
+                    label(f,"Modellierter Ertrag ${money(result.points.last().growth)} · ${result.skipped} Termine mangels Guthaben ausgelassen",14f)
+                    result.points.filterIndexed { index,_ -> index==0 || index%12==0 || index==result.points.lastIndex }.forEach { label(f,"${it.date}: ${money(it.total)}",14f) }
+                }
+                AlertDialog.Builder(this).setTitle("Vermögensprognose").setView(ScrollView(this).apply { addView(f) }).setPositiveButton("Schließen",null).show()
+            }
+        }
+        val journal=box(content);label(journal,"Vermögensjournal",20f,true)
+        Wealth.events(doc).reversed().forEach { e ->
+            val kinds=mapOf("transfer" to "Umbuchung","interest" to "Zinsen","dividend" to "Dividende","fee" to "Gebühr","buy" to "Kauf","sell" to "Verkauf")
+            val from=Wealth.asset(doc,e.num("from"))?.getString("name") ?: ""
+            val to=Wealth.asset(doc,e.num("to"))?.getString("name") ?: ""
+            label(journal,"${e.getString("date")} · ${kinds[e.getString("kind")]} · ${money(e.num("amount"))}\n$from → $to\n${e.getString("note")}",14f)
+            if(e.getString("kind")=="transfer") button(journal,"Bankbuchungen zuordnen / lösen") { wealthLinkDialog(e) }
+        }
+    }
+    private fun wealthAssetDialog(a:JSONObject?=null) {
+        val f=form();val name=field(f,"Name",a?.getString("name") ?: "")
+        val keys=Wealth.types.keys.toList();val type=select(f,"Produkt",Wealth.types.values.toList(),Wealth.types[a?.getString("type") ?: "savings"])
+        val date=field(f,"Bestandsdatum JJJJ-MM-TT",LocalDate.now().toString())
+        val value=field(f,"Bestand EUR / Depot-Verrechnungsguthaben ohne Positionen",Wealth.decimal(a?.let { Wealth.cash(data.wealth,it) } ?: 0),true)
+        val rate=field(f,"Jahreszins / Depot-Renditeannahme %",Wealth.decimal(a?.num("rate_bp") ?: 0),true)
+        val maturity=field(f,"Laufzeitende JJJJ-MM-TT (optional)",a?.getString("maturity") ?: "")
+        label(f,"Nur EUR. Depotpositionen zählen zusätzlich zum Guthaben. Ein Bestandswert enthält bereits alle bis dahin erfassten Bewegungen desselben Tages. Bausparen ohne Darlehen, Bonus oder Steuern.",14f,color=muted)
+        dialog("Vermögenswert",f) {
+            val c=JSONObject().put("op","asset").put("id",a?.num("id") ?: 0).put("name",name.text.toString()).put("type",keys[type.selectedItemPosition]).put("date",date.text.toString().trim()).put("value",Wealth.scaled(value.text.toString())).put("rate_bp",Wealth.scaled(rate.text.toString())).put("maturity",maturity.text.toString().trim())
+            Wealth.apply(data.wealth,c);change({store.wealthCommand(c)})
+        }
+    }
+    private fun wealthPlanDialog(p:JSONObject?=null) {
+        val assets=Wealth.assets(data.wealth);if(assets.size<2){toast("Zuerst Quellkonto und Zielanlage erfassen.");return}
+        val f=form();val name=field(f,"Bezeichnung",p?.getString("name") ?: "")
+        val names=assets.map { it.getString("name") };val from=select(f,"Von",names,assets.find { it.num("id")==p?.num("from") }?.getString("name"));val to=select(f,"Nach",names,assets.find { it.num("id")==p?.num("to") }?.getString("name") ?: names[1])
+        val amount=field(f,"Betrag EUR",p?.let { Wealth.decimal(it.num("amount")) } ?: "",true)
+        val start=field(f,"Erster Termin JJJJ-MM-TT",p?.getString("start") ?: LocalDate.now().toString());val end=field(f,"Letzter Termin (optional)",p?.getString("end") ?: "")
+        val rhythms=listOf(1,3,6,12);val every=select(f,"Rhythmus",listOf("Monatlich","Vierteljährlich","Halbjährlich","Jährlich"),listOf("Monatlich","Vierteljährlich","Halbjährlich","Jährlich")[rhythms.indexOf(p?.optInt("every",1) ?: 1).coerceAtLeast(0)])
+        val active=check(f,"Aktiv",p?.getBoolean("enabled") ?: true)
+        label(f,"Fällige Termine erst nach Bestätigung buchen. Monatsende wird gekürzt. Depotzuflüsse bleiben Verrechnungsguthaben, bis ein Kauf erfasst wird.",14f,color=muted)
+        dialog("Vermögensdauerauftrag",f) {
+            val c=JSONObject().put("op","plan").put("id",p?.num("id") ?: 0).put("name",name.text.toString()).put("from",assets[from.selectedItemPosition].num("id")).put("to",assets[to.selectedItemPosition].num("id")).put("amount",Wealth.scaled(amount.text.toString())).put("start",start.text.toString().trim()).put("end",end.text.toString().trim()).put("every",rhythms[every.selectedItemPosition]).put("enabled",active.isChecked)
+            Wealth.apply(data.wealth,c);change({store.wealthCommand(c)})
+        }
+    }
+    private fun wealthEventDialog() {
+        val assets=Wealth.assets(data.wealth);if(assets.isEmpty()){toast("Zuerst Vermögenswerte erfassen.");return}
+        val f=form();val kinds=listOf("transfer","interest","dividend","fee");val kind=select(f,"Art",listOf("Umbuchung","Zinsen","Dividende","Gebühr"))
+        val names=assets.map { it.getString("name") };val from=select(f,"Quelle (nur Umbuchung)",names);val to=select(f,"Ziel / betroffenes Produkt",names,names.getOrNull(1))
+        val amount=field(f,"Betrag EUR","",true);val date=field(f,"Datum JJJJ-MM-TT",LocalDate.now().toString());val note=field(f,"Notiz")
+        label(f,"Keine Ausgabe / Einnahme. Bewegungen bleiben im Vermögensjournal; Korrekturen über Gegenumbuchung oder Bestandswert. Importierte Bankbuchungen nach dem Buchen zuordnen.",14f,color=muted)
+        dialog("Vermögensbewegung",f) {
+            val c=JSONObject().put("op","event").put("kind",kinds[kind.selectedItemPosition]).put("from",if(kind.selectedItemPosition==0)assets[from.selectedItemPosition].num("id") else 0).put("to",assets[to.selectedItemPosition].num("id")).put("amount",Wealth.scaled(amount.text.toString())).put("date",date.text.toString().trim()).put("note",note.text.toString()).put("entries",JSONArray())
+            Wealth.apply(data.wealth,c);change({store.wealthCommand(c)})
+        }
+    }
+    private fun wealthPositionDialog(a:JSONObject,p:JSONObject?=null,trade:Boolean=false) {
+        val f=form();val name=field(f,"Positionsname (eindeutig)",p?.getString("name") ?: "").apply { if(p!=null)isEnabled=false };val symbol=field(f,"Börsensymbol (EUR-Notierung, optional)",p?.getString("symbol") ?: "")
+        val units=field(f,if(trade)"Gehandelte Stückzahl" else "Bestand in Stück",if(trade)"" else Wealth.decimal(p?.num("units") ?: 0,6),true)
+        val price=field(f,"Kurs je Stück EUR",Wealth.decimal(p?.num("price") ?: 0,6),true)
+        val date=field(f,"Kurs- / Handelsdatum",if(trade)LocalDate.now().toString() else p?.getString("date") ?: LocalDate.now().toString())
+        val sell=if(trade)check(f,"Verkaufen statt kaufen",false) else null
+        label(f,"Stückzahl und Kurs mit höchstens sechs Nachkommastellen. Bestand setzen ist eine Eröffnungs-/Bestandskorrektur ohne Geldbewegung. Käufe und Verkäufe ändern das Verrechnungsguthaben zusätzlich.",14f,color=muted)
+        dialog(if(trade)"Wertpapierhandel" else "Wertpapierbestand",f) {
+            val c=JSONObject().put("op",if(trade)"trade" else "position").put("id",a.num("id")).put("name",name.text.toString()).put("symbol",symbol.text.toString().trim()).put("units",Wealth.scaled(units.text.toString(),6)).put("price",Wealth.scaled(price.text.toString(),6)).put("date",date.text.toString().trim()).put("sell",sell?.isChecked ?: false)
+            Wealth.apply(data.wealth,c);change({store.wealthCommand(c)})
+        }
+    }
+    private fun wealthLinkDialog(e:JSONObject) {
+        val used=Wealth.events(data.wealth).filter { it.num("id")!=e.num("id") }.flatMap { x -> val a=x.getJSONArray("entries");(0 until a.length()).map { a.getLong(it) } }.toSet()
+        val entries=data.entries.filter { it.id !in used && it.kind=="expense" && it.parts.isEmpty() && it.group.isEmpty() && kotlin.math.abs(it.amount)==e.num("amount") }
+        val options=listOf("Keine")+entries.map { "${it.date} · ${it.merchant} · ${money(it.amount)}" };val ids=listOf(0L)+entries.map { it.id };val linked=e.getJSONArray("entries")
+        val f=form();val first=select(f,"Bankbuchung",options,options[ids.indexOf(linked.optLong(0,0)).coerceAtLeast(0)]);val second=select(f,"Gegenbuchung (optional)",options,options[ids.indexOf(linked.optLong(1,0)).coerceAtLeast(0)])
+        label(f,"Keine neue Geldbewegung. Zugeordnete Bankbuchungen werden in Ausgaben und Diagrammen nicht gezählt. „Keine“ hebt eine bestehende Zuordnung auf.",14f,color=muted)
+        dialog("Bankzuordnung",f) { val a=JSONArray();listOf(ids[first.selectedItemPosition],ids[second.selectedItemPosition]).filter { it>0 }.forEach { a.put(it) };change({store.wealthCommand(JSONObject().put("op","link").put("id",e.num("id")).put("entries",a))}) }
+    }
+    private fun wealthQuoteDialog(a:JSONObject,p:JSONObject) {
+        val f=form();label(f,"Alpha Vantage: ein kostenloser Tageskurs-Abruf für ${p.getString("symbol")}. Keine Echtzeitdaten. API-Schlüssel wird nicht gespeichert.",14f)
+        val key=field(f,"Kostenloser API-Schlüssel").apply { inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD }
+        val eur=check(f,"Symbol notiert in EUR; kostenlosen Zugang verwenden",false)
+        label(f,"Keine automatische Währungsumrechnung. Ohne Schlüssel bleiben manuelle Kurse und alle anderen Funktionen offline nutzbar.",14f,color=muted)
+        dialog("Börsenkurs aktualisieren",f,"Abrufen") { require(eur.isChecked) { "EUR-Notierung bestätigen." };val k=key.text.toString().trim();change({store.refreshWealthQuote(a.num("id"),p.getString("name"),k)}) }
     }
     private fun report(period: String?=month.toString())=Ledger.rows(data.entries,period,effective,data.accounts,data.transfers)
     private fun overview() {
@@ -171,7 +298,7 @@ class MainActivity : Activity() {
     }
     private fun categoryTotals(): List<Pair<String,Long>> {
         if(effective) return report().filter { it.kind!="income" }.flatMap { r -> if(r.parts.isEmpty()) listOf(r.category to r.amount) else r.parts.map { it.category to it.amount } }.groupBy { it.first }.map { (k,v)->k to v.sumOf { it.second } }.filter { it.second!=0L }.sortedByDescending { it.second }
-        return data.entries.filter { it.date.startsWith(month.toString()) && it.kind!="income" }.flatMap { e -> if(e.parts.isEmpty()) listOf(e.category to e.amount) else e.parts.map { it.category to it.amount } }.groupBy { it.first }.map { (k,v)->k to v.sumOf { it.second } }.filter { it.second!=0L }.sortedByDescending { it.second }
+        return data.entries.filter { !it.wealthTransfer && it.date.startsWith(month.toString()) && it.kind!="income" }.flatMap { e -> if(e.parts.isEmpty()) listOf(e.category to e.amount) else e.parts.map { it.category to it.amount } }.groupBy { it.first }.map { (k,v)->k to v.sumOf { it.second } }.filter { it.second!=0L }.sortedByDescending { it.second }
     }
     private fun entryRow(parent: LinearLayout,r: ReportRow) {
         val b=column(parent)

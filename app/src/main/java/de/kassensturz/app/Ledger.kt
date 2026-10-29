@@ -10,7 +10,7 @@ data class Part(val name: String, val amount: Long, val category: String, val gr
 data class Entry(val id: Long = 0, val date: String, val merchant: String, val amount: Long,
     val category: String, val payment: String = "", val kind: String = "expense", val notes: String = "",
     val group: String = "", val parts: List<Part> = emptyList(), val receipt: Boolean = false,
-    val counterparty: String = "", val importKey: String? = null)
+    val counterparty: String = "", val importKey: String? = null, val wealthTransfer: Boolean = false)
 data class Account(val name: String, val share: Int = 10000, val shareIncome: Boolean = true, val iban: String = "")
 data class Transfer(val outgoing: Long, val incoming: Long)
 data class ReportRow(val date: String, val name: String, val amount: Long, val category: String, val kind: String,
@@ -56,7 +56,7 @@ object Ledger {
     fun rows(entries: List<Entry>, month: String?, effective: Boolean, accounts: List<Account> = emptyList(), transfers: List<Transfer> = emptyList()): List<ReportRow> {
         val excluded = if (effective) transfers.flatMap { listOf(it.outgoing, it.incoming) }.toSet() else emptySet()
         val settings = accounts.associateBy { it.name }
-        val source = entries.filter { it.id !in excluded }.map { if (effective) personal(it, settings[it.payment]) else it }
+        val source = entries.filter { it.id !in excluded && !it.wealthTransfer }.map { if (effective) personal(it, settings[it.payment]) else it }
         data class Piece(val entry: Entry, val amount: Long, val category: String, val group: String, val label: String)
         fun pieces(e: Entry): List<Piece> = if (e.kind != "income" && e.parts.isNotEmpty() && e.parts.any { it.group != null })
             e.parts.map { Piece(e, it.amount, it.category, it.group ?: e.group, e.merchant + " · " + it.name) }

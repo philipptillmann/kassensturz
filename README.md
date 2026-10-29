@@ -57,9 +57,39 @@ installed app data. The repository reorganization retains version 0.3.0/code 4.
   transaction; a failed restore leaves the old dataset intact. CSV export is a
   spreadsheet export, not a complete backup and not a lossless re-import format.
 
-No Internet permission is granted to the application. No server login or
+Internet permission is used only for the optional, explicitly requested stock
+quote lookup added in 0.14.0. All ledger, wealth, receipt and OCR functions still
+work offline with manual prices. No background quote refresh occurs. No server login or
 multi-user sharing is implemented in this local, single-owner version. Android
 cloud backup and device transfer are excluded; use explicit in-app backups.
+
+## Wealth overview (0.14.0 / code 16)
+
+The **Vermögen** tab manages EUR assets: current/settlement accounts, brokerage
+portfolios, building savings, fixed deposits, savings and other balances.
+Transfers and recurring savings orders are separate wealth movements, excluded
+from expense/income reports. Match imported bank entries to an existing wealth
+transfer to avoid counting them as expenses; linking creates no second movement.
+Due orders are booked only after confirmation and each occurrence only once.
+
+Balances, positions (up to six decimal places), cash-funded purchases/sales,
+interest, dividends and fees have a separate journal. Forecasts use daily ACT/365
+accrual with month-end credit, maturity cutoff and three brokerage scenarios.
+Portfolio return assumptions apply to securities, not settlement cash. Projected
+growth is not spendable cash; unfunded orders are counted as skipped. No automatic
+share purchases, taxes, inflation, building-loan or bonus calculations.
+
+Quotes are optional: enter a personal free Alpha Vantage key, verify a EUR-listed
+symbol and explicitly request one daily quote. The key is not stored or backed
+up; no retries, background polling or premium/realtime parameters. The free key
+requires email registration; see [provider support](https://www.alphavantage.co/support/).
+Manual prices and all other features work offline. Internet permission is needed
+for this optional lookup; no server connection or account is introduced.
+
+Full ZIPs include wealth data. Format 2 prevents older apps silently dropping it;
+format-1 backups remain readable and clear wealth in the restored dataset.
+Native instrumentation tests include the same cent vectors as the server.
+No Android build, emulator or physical-device test has run for this source change.
 
 ## Build and install
 

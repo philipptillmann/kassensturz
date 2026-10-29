@@ -31,7 +31,7 @@ class LaunchTest {
             instrumentation.runOnMainSync { assertNotNull(find(a.window.decorView,"Kassensturz")) }
             instrumentation.waitForIdleSync()
             instrumentation.runOnMainSync { assertNotNull(find(a.window.decorView,"Vollständige Sicherung erstellen")) }
-            assertFalse(a.packageManager.getPackageInfo(a.packageName,android.content.pm.PackageManager.GET_PERMISSIONS).requestedPermissions?.contains("android.permission.INTERNET") ?: false)
+            assertTrue(a.packageManager.getPackageInfo(a.packageName,android.content.pm.PackageManager.GET_PERMISSIONS).requestedPermissions?.contains("android.permission.INTERNET") ?: false)
         } finally { instrumentation.runOnMainSync { a.finish() } }
     }
 }

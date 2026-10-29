@@ -26,9 +26,9 @@ private fun JSONArray.strings() = (0 until length()).map { getString(it) }
 
 data class BackupSummary(val entries: Int, val receipts: Int, val dataset: String, val createdAt: String)
 
-data class Snapshot(val entries: List<Entry>, val categories: List<String>, val payments: List<String>, val accounts: List<Account>, val transfers: List<Transfer>, val ignored: List<Transfer> = emptyList(), val paymentTypes: Map<String,String> = emptyMap())
+data class Snapshot(val entries: List<Entry>, val categories: List<String>, val payments: List<String>, val accounts: List<Account>, val transfers: List<Transfer>, val ignored: List<Transfer> = emptyList(), val paymentTypes: Map<String,String> = emptyMap(), val wealth: JSONObject = Wealth.empty())
 
-class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if (demo) "demo.sqlite3" else "private.sqlite3", null, 4) {
+class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if (demo) "demo.sqlite3" else "private.sqlite3", null, 5) {
     override fun onConfigure(db: SQLiteDatabase) { db.setForeignKeyConstraintsEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE categories(name TEXT PRIMARY KEY NOT NULL)")
@@ -40,17 +40,50 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         db.execSQL("CREATE TABLE ignored(outgoing INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,incoming INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,PRIMARY KEY(outgoing,incoming))")
         createCsvUndo(db)
         createPaymentTypes(db)
+        createWealth(db)
         listOf("Unkategorisiert","Lebensmittel","Wohnen","Mobilität","Freizeit","Ausgehen","Shopping","Gesundheit","Gehalt","Geschenke","Sonstige Einnahmen").forEach { db.insertOrThrow("categories",null,values("name" to it)) }
         listOf("Bar","PayPal","Bankkarte").forEach { db.insertOrThrow("payments",null,values("name" to it)) }
         if (demo) seed(db)
     }
     override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) {
-        require(old >= 1 && new <= 4) { "Unbekannte Datenbankversion $old → $new" }
+        require(old >= 1 && new <= 5) { "Unbekannte Datenbankversion $old → $new" }
+        if(old < 5) createWealth(db)
         if(old < 4) createPaymentTypes(db)
         if(old < 3) createCsvUndo(db)
         if(old < 2) db.insertWithOnConflict("categories",null,values("name" to "Ausgehen"),SQLiteDatabase.CONFLICT_IGNORE)
     }
     private fun createPaymentTypes(db:SQLiteDatabase) { db.execSQL("CREATE TABLE payment_types(name TEXT PRIMARY KEY REFERENCES payments(name) ON DELETE CASCADE,kind TEXT NOT NULL CHECK(kind IN ('cash','other')))") }
+    private fun createWealth(db:SQLiteDatabase) { db.execSQL("CREATE TABLE IF NOT EXISTS wealth_state(id INTEGER PRIMARY KEY CHECK(id=1),data TEXT NOT NULL)") }
+    private fun wealth(db:SQLiteDatabase=readableDatabase): JSONObject = db.rawQuery("SELECT data FROM wealth_state WHERE id=1",null).use { c -> if(c.moveToFirst())JSONObject(c.getString(0)) else Wealth.empty() }
+    private fun putWealth(db:SQLiteDatabase, d:JSONObject) { Wealth.validate(d);db.insertWithOnConflict("wealth_state",null,values("id" to 1,"data" to d.toString()),SQLiteDatabase.CONFLICT_REPLACE) }
+    fun wealthCommand(command:JSONObject) = transaction { db ->
+        val next=Wealth.apply(wealth(db),command)
+        validateWealthLinks(db,next)
+        putWealth(db,next)
+    }
+    private fun validateWealthLinks(db:SQLiteDatabase, next:JSONObject) {
+        Wealth.events(next).forEach { e ->
+            val linked=e.getJSONArray("entries");val signs=mutableListOf<Boolean>()
+            repeat(linked.length()) { i ->
+                db.rawQuery("SELECT amount,kind,group_name,parts FROM entries WHERE id=?",arrayOf(linked.getLong(i).toString())).use { c ->
+                    require(c.moveToFirst() && c.getString(1)=="expense" && c.getString(2).isEmpty() && JSONArray(c.getString(3)).length()==0 && kotlin.math.abs(c.getLong(0))==e.num("amount")) { "Nur passende, ungeteilte Bankbuchungen ohne Gruppe zuordnen." }
+                    signs.add(c.getLong(0)>0)
+                }
+            }
+            require(signs.size<2 || signs[0]!=signs[1]) { "Zwei Bankbuchungen müssen entgegengesetzte Vorzeichen haben." }
+        }
+    }
+    fun refreshWealthQuote(id:Long, name:String, key:String) {
+        val original=wealth();val a=Wealth.asset(original,id) ?: error("Depot fehlt.")
+        val p=a.getJSONArray("positions").rows().first { it.getString("name")==name }
+        val quote=WealthQuotes.fetch(p.getString("symbol"),key)
+        transaction { db ->
+            val latest=wealth(db);val current=Wealth.asset(latest,id)?.getJSONArray("positions")?.rows()?.find { it.getString("name")==name } ?: error("Position fehlt.")
+            require(current.toString()==p.toString()) { "Position inzwischen geändert." }
+            require(quote.second>=current.getString("date")) { "Anbieter liefert älteren Kurs; gespeicherter Kurs bleibt erhalten." }
+            current.put("price",quote.first).put("date",quote.second);putWealth(db,latest)
+        }
+    }
     fun configurePayment(name:String,kind:String,account:Account?=null) = transaction { db ->
         val cleaned=name.trim();require(cleaned.isNotEmpty() && cleaned.length<=60 && kind in listOf("cash","bank","other")) { "Ungültiges Zahlungsmittel." }
         if(kind=="bank") { require(account!=null && account.name==cleaned) { "Kontoeinstellungen fehlen." };configure(account) }
@@ -71,6 +104,8 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         if(c.moveToFirst()) CsvUndo(c.getString(0),c.getString(1),c.getInt(2)) else null
     }
     fun revertCsvImport(token:String): Int = transaction { db ->
+        val linked=Wealth.linked(wealth(db))
+        require(db.rawQuery("SELECT entry_id FROM csv_undo_entries",null).use { c -> var safe=true;while(c.moveToNext())if(c.getLong(0) in linked)safe=false;safe }) { "Zuerst Bankzuordnungen dieses Imports im Vermögensjournal aufheben." }
         val current=lastCsvImport()
         require(current!=null && current.token==token) { "CSV-Import hat sich geändert oder wurde bereits rückgängig gemacht. Bitte erneut prüfen." }
         val removed=db.delete("entries","id IN (SELECT entry_id FROM csv_undo_entries)",null)
@@ -89,6 +124,7 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         return if (e.id == 0L) db.insertOrThrow("entries",null,v) else { require(db.update("entries",v,"id=?",arrayOf(e.id.toString())) == 1) { "Buchung nicht gefunden." }; e.id }
     }
     fun save(e: Entry, receipt: ByteArray? = null, removeReceipt: Boolean = false): Long = transaction { db ->
+        require(e.id !in Wealth.linked(wealth(db))) { "Zuerst Bankzuordnung im Vermögensjournal aufheben." }
         val id = putEntry(db,e)
         // Editing either leg invalidates an earlier manual transfer pairing.
         db.delete("transfers","outgoing=? OR incoming=?",arrayOf(id.toString(),id.toString()))
@@ -100,7 +136,7 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         reconcile()
         id
     }
-    fun delete(id: Long) { writableDatabase.delete("entries","id=?",arrayOf(id.toString())) }
+    fun delete(id: Long) { require(id !in Wealth.linked(wealth())) { "Zuerst Bankzuordnung im Vermögensjournal aufheben." };writableDatabase.delete("entries","id=?",arrayOf(id.toString())) }
     fun receipt(id: Long): ByteArray? = readableDatabase.rawQuery("SELECT image FROM receipts WHERE entry_id=?",arrayOf(id.toString())).use { if (it.moveToFirst()) it.getBlob(0) else null }
     fun snapshot(): Snapshot {
         val db = readableDatabase
@@ -115,7 +151,8 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         val transfers = db.rawQuery("SELECT * FROM transfers",null).use { c -> buildList { while(c.moveToNext()) add(Transfer(c.getLong(0),c.getLong(1))) } }
         val ignored=db.rawQuery("SELECT * FROM ignored",null).use { c -> buildList { while(c.moveToNext()) add(Transfer(c.getLong(0),c.getLong(1))) } }
         val types=db.rawQuery("SELECT name,kind FROM payment_types",null).use { c -> buildMap<String,String> { while(c.moveToNext())put(c.getString(0),c.getString(1)) } }
-        return Snapshot(entries,names("categories"),names("payments"),accounts,transfers,ignored,types)
+        val wealth=wealth(db);val linked=Wealth.linked(wealth)
+        return Snapshot(entries.map { it.copy(wealthTransfer=it.id in linked) },names("categories"),names("payments"),accounts,transfers,ignored,types,wealth)
     }
     fun addName(name: String, category: Boolean) {
         val cleaned = name.trim(); require(cleaned.isNotEmpty() && cleaned.length <= 60) { "Name: 1–60 Zeichen." }
@@ -210,6 +247,7 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         require(s.entries.size <= 50000 && s.categories.size <= 2000 && s.payments.size <= 2000) { "Datensatz für dieses Sicherungsformat zu groß." }
         readableDatabase.rawQuery("SELECT COALESCE(SUM(length(image)),0) FROM receipts",null).use { c -> c.moveToFirst();require(c.getLong(0)<=512_000_000) { "Belege für dieses Sicherungsformat zu groß (max. 512 MB)." } }
         val metadata=JSONObject().put("format","kassensturz-android").put("version",1).put("category_defaults_version",1).put("dataset",if(demo)"demo" else "private").put("created_at",java.time.Instant.now().toString())
+            .put("wealth",s.wealth).put("version",if(Wealth.assets(s.wealth).isEmpty())1 else 2)
             .put("payment_types",JSONObject(s.paymentTypes))
             .put("categories",JSONArray(s.categories)).put("payments",JSONArray(s.payments))
             .put("entries",JSONArray().apply { s.entries.forEach { put(entryJson(it)) } })
@@ -227,7 +265,8 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         ZipInputStream(input).use { zip ->
             require(zip.nextEntry?.name == "data.json") { "Keine Kassensturz-Android-Sicherung." }
             val meta=JSONObject(readLimited(zip,16_000_000).toString(Charsets.UTF_8))
-            require(meta.getString("format")=="kassensturz-android" && meta.getInt("version")==1) { "Unbekanntes Sicherungsformat." }
+            require(meta.getString("format")=="kassensturz-android" && meta.getInt("version") in 1..2) { "Unbekanntes Sicherungsformat." }
+            val wealth=Wealth.validate(meta.optJSONObject("wealth") ?: Wealth.empty())
             val cats=meta.getJSONArray("categories").strings().toMutableList()
             require(cats.isNotEmpty()) { "Ungültige Kategorien in der Sicherung." }
             // Migrate legacy backups once; modern backups retain renamed defaults.
@@ -268,13 +307,18 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
                 db.insertOrThrow("receipts",null,values("entry_id" to id,"image" to bytes))
             }
             require(expectedReceipts.isEmpty()) { "Belege fehlen in der Sicherung." }
+            val ids=snapshot().entries.map { it.id }.toSet()
+            require(Wealth.linked(wealth).all { it in ids }) { "Vermögensumbuchung verweist auf fehlende Bankbuchung." }
+            validateWealthLinks(db,wealth)
+            putWealth(db,wealth)
         }
     }
     companion object {
         fun inspectBackup(input: InputStream): BackupSummary = ZipInputStream(input).use { zip ->
             require(zip.nextEntry?.name == "data.json") { "Keine Kassensturz-Sicherung." }
             val meta=JSONObject(readLimited(zip,16_000_000).toString(Charsets.UTF_8))
-            require(meta.getString("format")=="kassensturz-android" && meta.getInt("version")==1) { "Unbekanntes Sicherungsformat." }
+            require(meta.getString("format")=="kassensturz-android" && meta.getInt("version") in 1..2) { "Unbekanntes Sicherungsformat." }
+            Wealth.validate(meta.optJSONObject("wealth") ?: Wealth.empty())
             val entries=meta.getJSONArray("entries").objects()
             require(entries.size<=50000) { "Zu viele Buchungen." }
             BackupSummary(entries.size,entries.count { it.getBoolean("receipt") },meta.optString("dataset","unknown").take(20),meta.optString("created_at","").take(100))
