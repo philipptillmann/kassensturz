@@ -1,0 +1,18 @@
+# Opt in: docker compose -f compose.yaml -f compose.encrypted.yaml ...
+# For existing installations migrate to a NEW directory first (docs/SECURITY.md).
+services:
+  app:
+    environment:
+      DATA_ENCRYPTION_KEY_FILE: /run/secrets/data_encryption_key
+      ENCRYPTED_TMPDIR: /tmp
+    volumes:
+      - type: bind
+        source: ${ENCRYPTED_DATA_DIR:?Set an absolute encrypted database directory}
+        target: /data
+        bind:
+          create_host_path: false
+    secrets:
+      - data_encryption_key
+secrets:
+  data_encryption_key:
+    file: ${DATA_KEY_FILE:?Set an absolute key file outside Git and outside the data directory}

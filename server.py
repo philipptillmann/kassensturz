@@ -5,7 +5,8 @@ import io
 import json
 import os
 import secrets
-import sqlite3
+import storage
+from storage import sqlite3
 import threading
 import time
 import tempfile
@@ -42,6 +43,8 @@ def configured_password():
 
 
 def create_app(password=None, public_url=None):
+    require_https = public_url is None and os.environ.get('ALLOW_HTTP', '0') != '1'
+    storage.temporary_directory()  # Validate encrypted scratch before initializing any data.
     password = configured_password() if password is None else password
     if len(password) < 12:
         raise ValueError('Password must contain at least 12 characters.')
@@ -50,7 +53,15 @@ def create_app(password=None, public_url=None):
         parsed = urlsplit(public_url)
         if parsed.scheme not in ('http', 'https') or not parsed.netloc or parsed.path or parsed.query or parsed.fragment or parsed.username:
             raise ValueError('PUBLIC_URL must be an origin, e.g. https://expenses.example.com (no path).')
+        host = '['+parsed.hostname+']' if ':' in parsed.hostname else parsed.hostname
+        suffix = ':'+str(parsed.port) if parsed.port is not None and parsed.port != (443 if parsed.scheme == 'https' else 80) else ''
+        public_url = parsed.scheme+'://'+host+suffix
+    if require_https and not public_url.startswith('https://'):
+        raise ValueError('Production requires PUBLIC_URL=https://…; use ALLOW_HTTP=1 only for localhost development.')
     web = Flask(__name__, static_folder=None)
+    if require_https:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        web.wsgi_app = ProxyFix(web.wsgi_app, x_proto=1)
     web.config['MAX_CONTENT_LENGTH'] = MAX_BODY
     web.config['MAX_FORM_MEMORY_SIZE'] = 100_000
     if public_url:
@@ -80,6 +91,10 @@ def create_app(password=None, public_url=None):
 
     @web.before_request
     def access_control():
+        if require_https and not request.is_secure and request.path != '/healthz':
+            if request.method in ('GET','HEAD'):
+                return web.redirect(public_url + request.full_path.rstrip('?'), code=308)
+            return failure('HTTPS ist erforderlich.', 426)
         if request.path in ('/json-import','/json-options'):
             request.max_content_length = shortcut_api.MAX_BODY
             expected_method = 'GET' if request.path == '/json-options' else 'POST'
@@ -384,7 +399,7 @@ def create_app(password=None, public_url=None):
 
     @web.get('/api/backup')
     def download_backup():
-        output = tempfile.SpooledTemporaryFile(max_size=1_000_000, dir=g.dataset_paths[g.dataset].parent)
+        output = tempfile.SpooledTemporaryFile(max_size=1_000_000, dir=storage.temporary_directory(g.dataset_paths[g.dataset].parent))
         try:
             backups.write_archive(g.dataset_paths[g.dataset], output, dataset=g.dataset)
             size = output.tell()
@@ -404,7 +419,7 @@ def create_app(password=None, public_url=None):
         restoring = request.path.endswith('backup-restore')
         if restoring and request.headers.get('X-Backup-Confirm') != g.dataset:
             return failure('Wiederherstellen des ausgewählten Datensatzes bitte bestätigen.')
-        with tempfile.SpooledTemporaryFile(max_size=1_000_000, dir=g.dataset_paths[g.dataset].parent) as upload:
+        with tempfile.SpooledTemporaryFile(max_size=1_000_000, dir=storage.temporary_directory(g.dataset_paths[g.dataset].parent)) as upload:
             size = 0
             while True:
                 chunk = request.stream.read(65536)
@@ -418,7 +433,7 @@ def create_app(password=None, public_url=None):
             if restoring:
                 result = backups.restore(upload, g.dataset_paths[g.dataset])
             else:
-                result = backups.preview(upload, temp_dir=g.dataset_paths[g.dataset].parent)
+                result = backups.preview(upload, temp_dir=storage.temporary_directory(g.dataset_paths[g.dataset].parent))
             result['target_dataset'] = g.dataset
             return jsonify(result)
 
@@ -531,6 +546,6 @@ if __name__ == '__main__':
     application = create_app()
     port = int(os.environ.get('PORT', '8080'))
     print(f'Kassensturz listening on port {port}', flush=True)
-    serve(application, host='0.0.0.0', port=port, threads=8,
+    serve(application, trusted_proxy='*', trusted_proxy_headers={'x-forwarded-proto'}, host='0.0.0.0', port=port, threads=8,
           max_request_body_size=backups.MAX_ARCHIVE_BYTES, channel_timeout=120,
           clear_untrusted_proxy_headers=True, expose_tracebacks=False)

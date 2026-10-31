@@ -20,7 +20,7 @@ am API-Schlüssel. Dieselbe Adresse und denselben Bearer-Schlüssel wie beim Anl
 verwenden. Ein JSON-Anfragetext oder Content-Type-Header ist für GET nicht nötig.
 
 ```sh
-curl http://DEIN-SERVER:8082/json-options \
+curl https://DEIN-SERVER:8082/json-options \
   -H 'Authorization: Bearer DEIN_KASSENSTURZ_SCHLUESSEL'
 ```
 
@@ -58,7 +58,7 @@ Eine normale Browser-Anmeldung ersetzt den Bearer-Schlüssel hier nicht.
 
 ## Anfrage
 
-URL: `http://DEIN-SERVER:8082/json-import` (eigene Adresse/Port anpassen).
+URL: `https://DEIN-SERVER:8082/json-import` (eigene Adresse/Port anpassen).
 Vom iPhone erreichbare LAN-/VPN-Adresse oder HTTPS verwenden.
 In **Inhalt von URL abrufen** die Methode **POST** und den Anfragetext **JSON** wählen.
 
@@ -137,7 +137,7 @@ wird ein erneuter Aufruf mit **409** abgelehnt; die bestehende Buchung in der Ap
 ## Beispiel mit curl
 
 ```sh
-curl http://DEIN-SERVER:8082/json-import \
+curl https://DEIN-SERVER:8082/json-import \
   -H 'Authorization: Bearer DEIN_KASSENSTURZ_SCHLUESSEL' \
   -H 'Content-Type: application/json' \
   --data-binary @docs/examples/shortcut-expense.json

@@ -1,4 +1,10 @@
-{$DOMAIN} {
-    encode gzip
-    reverse_proxy app:8080
+{
+	auto_https disable_redirects
+}
+https://{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:8080
+}
+http://{$DOMAIN} {
+	redir https://{$DOMAIN}:{$HTTPS_PORT}{uri} 308
 }

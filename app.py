@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-import csv, datetime, hashlib, io, json, os, re, sqlite3, secrets
+import csv, datetime, hashlib, io, json, os, re, secrets
+import storage
+from storage import sqlite3
 from contextlib import nullcontext, closing
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -9,7 +11,7 @@ DB = Path(os.environ.get('DATA_DIR', str(ROOT / 'data'))) / 'expenses.sqlite3'
 CATEGORIES = ['Unkategorisiert', 'Lebensmittel', 'Wohnen', 'Küche & Haushalt', 'Fahrrad', 'Mobilität', 'Shopping', 'Freizeit', 'Ausgehen', 'Gesundheit', 'Abos', 'Reisen', 'Gehalt', 'Geschenke', 'Sonstige Einnahmen']
 
 def connect(db=None):
-    con = sqlite3.connect(DB if db is None else db, timeout=15)
+    con = storage.connect(DB if db is None else db, timeout=15)
     con.row_factory = sqlite3.Row
     con.execute('PRAGMA foreign_keys=ON')
     return con

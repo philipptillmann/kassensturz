@@ -1,8 +1,12 @@
+> **Server-Sicherheitsstandard ab 1.0.0:** HTTPS ist Standard; vor einem Update
+> DOMAIN, HTTPS-Port und Zertifikatsvertrauen einrichten. Verschlüsselung ist
+> optional und standardmäßig aus. [Aktuelle Einrichtung und Migration](docs/SECURITY.md).
+
 # Kassensturz — Server
 
 Ausgaben, Kategorien und aufgeteilte Rechnungen in einer gemeinsamen Web-App. Laptop und Handy greifen auf dieselbe SQLite-Datenbank zu. Installation mit Docker Compose auf einem NAS, Heimserver, VPS oder Mac mit Docker Desktop.
 
-Der Branch `local` enthält weiterhin die ursprüngliche Mac-Version. Dieser Branch `server` verwendet Flask und Waitress sowie Tesseract statt Apple Vision. Alle angemeldeten Geräte teilen **ein Haushaltskonto**; es gibt keine getrennten Benutzer oder Berechtigungsstufen.
+Die Branches `server` und `local` teilen Flask/Waitress und Tesseract. Local ist eine Loopback-Entwicklungsumgebung. Benutzer haben getrennte Datensätze; die eigenständige Android-App liegt im Branch `android-standalone`.
 
 ## Vermögensübersicht (0.14.0)
 
@@ -11,9 +15,10 @@ Umbuchungen und Sparpläne zählen getrennt von Ausgaben; Prognosen berücksicht
 Zinsen, Laufzeiten und verfügbare Quellguthaben. Optionaler Börsenkursabruf mit
 eigenem kostenlosen API-Schlüssel. [Bedienung und Rechenregeln](docs/WEALTH.md).
 
-## Installation im privaten Netzwerk
+## Installation mit HTTPS
 
-Voraussetzung: Docker Engine mit Compose v2 oder Docker Desktop. Der Rechner mit Docker muss eingeschaltet bleiben.
+Docker Engine mit Compose v2 oder Docker Desktop sowie einen erreichbaren
+DNS-/LAN-Namen einrichten. Der Server bleibt eingeschaltet.
 
 ```sh
 git clone --branch server https://github.com/philipptillmann/kassensturz.git
@@ -21,62 +26,31 @@ cd kassensturz
 cp .env.example .env
 ```
 
-In `.env` ein eigenes, langes Passwort setzen (mindestens 12 Zeichen):
-
-```dotenv
-APP_PASSWORD='hier-ein-eigenes-langes-passwort-eintragen'
-PORT=8080
-BIND_ADDRESS=0.0.0.0
-PUBLIC_URL=
-DOMAIN=
-```
-
-Den Beispieltext durch ein echtes Passwort ersetzen. `.env` wird nicht in Git oder ins Docker-Image aufgenommen. Werte mit `$` oder `#` in einfache Anführungszeichen setzen.
+In `.env` APP_PASSWORD, DOMAIN und HTTPS_PORT setzen. Für eine öffentliche Domain
+`CADDY_CONFIG=./Caddyfile` verwenden; für reine LAN-Namen/IPs
+`CADDY_CONFIG=./Caddyfile.internal` und dessen Root-Zertifikat auf den Geräten
+installieren. **[Einrichtung, Zertifikatsvertrauen und Update-Migration](docs/SECURITY.md)**
+vor dem ersten Start bzw. Update lesen. Bestehendes PORT wird als HTTPS-Port
+übernommen, wenn HTTPS_PORT nicht gesetzt ist.
 
 ```sh
 docker compose up -d --build
 docker compose ps
 ```
 
-- Auf dem Docker-Rechner: `http://localhost:8080`
-- Auf Laptop und Handy im gleichen Netzwerk: `http://SERVER-IP:8080`, z. B. `http://192.168.1.50:8080`
-- Auf beiden Geräten mit demselben Passwort anmelden. Bei Bedarf Port 8080 in der Firewall für das private Netz erlauben.
+Die App ausschließlich unter `https://DOMAIN:HTTPS_PORT` öffnen (443 kann
+weggelassen werden). HTTP leitet nur um; der App-Port wird nicht veröffentlicht.
+Docker-Daten-Volume und bisherige Benutzerdaten bleiben erhalten. Auf dem iPhone
+in Safari über Teilen → Zum Home-Bildschirm hinzufügen. Eine Serververbindung
+bleibt erforderlich.
 
-Das Handy benötigt keine eigene App. „Rechnung scannen“ öffnet die Fotoauswahl bzw. Kamera. Fotos werden zum Server übertragen und für die Texterkennung verarbeitet. Beim Speichern der Buchung wird das Foto als komprimiertes JPEG in der Datenbank archiviert. Änderungen sind beim erneuten Öffnen der Seite bzw. Zurückkehren zum Browser-Tab sichtbar. Bei gleichzeitigem Bearbeiten derselben Buchung gilt die zuletzt gespeicherte Änderung.
+### Optionale Verschlüsselung
 
-Die Standard-Konfiguration verwendet HTTP und ist für ein vertrauenswürdiges privates Netzwerk gedacht. Für Zugriff über das Internet die folgende HTTPS-Variante verwenden. Keine HTTP-Portfreigabe ins Internet einrichten.
-
-### App auf dem iPhone-Home-Bildschirm
-
-In Safari die App-Adresse öffnen und über „Teilen“ → „Zum Home-Bildschirm“
-hinzufügen. Name und Symbol sind als Kassensturz hinterlegt. Nach einem Update
-ein bestehendes Home-Bildschirm-Symbol bei Bedarf entfernen und neu hinzufügen,
-weil iOS das alte Symbol speichern kann. Das entfernt keine Serverdaten.
-Die App benötigt weiterhin eine Verbindung zum Server; es gibt keinen Offline-Modus.
-Für die reguläre PWA-Installation in anderen Browsern HTTPS verwenden.
-
-## HTTPS mit eigener Domain
-
-Die zusätzliche Compose-Datei enthält Caddy für automatische TLS-Zertifikate. Eine Domain muss auf den Server zeigen; TCP-Ports 80 und 443 müssen von außen erreichbar sein. Bei einem Heimserver sind dafür ggf. Router-Portweiterleitungen nötig.
-
-In `.env` das Passwort und die Domain setzen:
-
-```dotenv
-APP_PASSWORD='dein-eigenes-langes-passwort'
-DOMAIN=kassensturz.example.com
-```
-
-Dann **anstelle** der Standard-Konfiguration starten:
-
-```sh
-# Nur beim Wechsel von der HTTP-Installation: den bisherigen Stack anhalten.
-docker compose down
-docker compose -f compose.https.yaml up -d --build
-```
-
-Auf Laptop und Handy `https://kassensturz.example.com` öffnen. Diese Variante veröffentlicht ausschließlich den Reverse Proxy, nicht den App-Port. Beide Compose-Dateien nutzen denselben Projektnamen und dasselbe Daten-Volume. Bei weiteren Befehlen für die HTTPS-Variante immer `-f compose.https.yaml` ergänzen. Caddys Zertifikate liegen in eigenen persistenten Volumes.
-
-Bei einem bereits vorhandenen Reverse Proxy stattdessen in der Standard-Konfiguration `BIND_ADDRESS=127.0.0.1` und `PUBLIC_URL=https://deine-domain.example` setzen. Der Proxy muss den ursprünglichen `Host`-Header erhalten und auf Port 8080 weiterleiten. `PUBLIC_URL` ist eine einzelne Adresse ohne Pfad; danach über genau diese Adresse zugreifen. Secure-Cookies und HSTS werden bei einer HTTPS-Adresse aktiviert. Ungeprüfte Forwarded-Header werden nicht vertraut.
+Standardmäßig aus. SQLCipher verschlüsselt nach ausdrücklicher Aktivierung alle
+App-Datenbanken einschließlich Belegen und Vermögen. Bestehende Daten zuerst
+anhalten, sichern und mit `tools/encrypt_data.py` in ein neues Verzeichnis migrieren;
+Schlüssel getrennt sichern. Danach `./update.sh --encrypted` verwenden. Portable
+ZIP-Downloads bleiben Klartextexporte. [Details und Grenzen](docs/SECURITY.md).
 
 ## Funktionen
 

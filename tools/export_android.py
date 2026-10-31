@@ -2,7 +2,8 @@
 """Export one server dataset to an Android backup without authentication records.
 
 Run as the server operator against a local data directory or a complete backup.
-Only Python's standard library is required. Source databases are read-only.
+Plain SQLite export needs only the standard library. Encrypted sources require
+the optional SQLCipher driver and key-file environment. Sources are read-only.
 """
 import argparse
 from contextlib import closing
@@ -11,12 +12,16 @@ import json
 import os
 from pathlib import Path
 import re
-import sqlite3
+import sys
+if __package__ in (None, ''):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import storage
+from storage import sqlite3
 import zipfile
 
 
 def connect(path):
-    con = sqlite3.connect(Path(path).resolve().as_uri() + '?mode=ro', uri=True)
+    con = storage.connect(Path(path).resolve().as_uri() + '?mode=ro', uri=True)
     con.row_factory = sqlite3.Row
     return con
 

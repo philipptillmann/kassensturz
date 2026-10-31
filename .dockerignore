@@ -25,3 +25,6 @@
 !docs/*.txt
 !docs/examples/
 !docs/examples/*.json
+
+!storage.py
+!requirements-encryption.txt

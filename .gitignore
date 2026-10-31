@@ -11,3 +11,10 @@ secrets/
 *.db
 *.tar.gz
 *.zip
+
+*.key
+*.pem
+*.crt
+encrypted-data/
+
+.encrypted-deployment

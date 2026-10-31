@@ -3,7 +3,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     DATA_DIR=/data \
-    TMPDIR=/data \
+    TMPDIR=/tmp \
     PORT=8080 \
     OMP_THREAD_LIMIT=1
 RUN apt-get update \
@@ -13,9 +13,9 @@ RUN apt-get update \
     && useradd --uid 10001 --gid 10001 --no-create-home kassensturz \
     && mkdir /data && chown 10001:10001 /data
 WORKDIR /app
-COPY requirements.txt VERSION ./
-RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py backups.py shortcut_api.py wealth.py ./
+COPY requirements.txt requirements-encryption.txt VERSION ./
+RUN pip install --only-binary=:all: --no-cache-dir -r requirements.txt -r requirements-encryption.txt
+COPY storage.py app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py backups.py shortcut_api.py wealth.py ./
 COPY sample-data ./sample-data
 COPY static ./static
 COPY tests ./tests
