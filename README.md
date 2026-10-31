@@ -344,3 +344,12 @@ settings are exposed. Existing keys work; revocation/password-change rules apply
 See the [server guide](https://github.com/philipptillmann/kassensturz/blob/server/docs/SHORTCUT_API.md).
 The standalone Android app remains offline; this server-only feature aligns its
 version/build metadata without adding an HTTP service.
+
+## Server security (1.0.0)
+
+Server deployment now defaults to HTTPS and optionally supports SQLCipher server
+databases. [Server setup and limitations](https://github.com/philipptillmann/kassensturz/blob/server/docs/SECURITY.md).
+This does not encrypt Android storage or add a server dependency. Native runtime
+is unchanged; shared VERSION aligns to 1.0.0, with no new APK built.
+Development tracks server, local and android-standalone together; server-only
+features are explicitly documented instead of copied into the Android runtime.
