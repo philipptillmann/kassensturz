@@ -5,6 +5,7 @@ import io
 import os
 import subprocess
 import tempfile
+import storage
 import threading
 import warnings
 from pathlib import Path
@@ -68,7 +69,7 @@ def recognize_text(encoded):
     if not OCR_SLOT.acquire(blocking=False):
         raise OCRBusy('Die Texterkennung ist gerade belegt. Bitte kurz warten und erneut versuchen.')
     try:
-        with tempfile.TemporaryDirectory(prefix='kassensturz-') as folder:
+        with tempfile.TemporaryDirectory(prefix='kassensturz-', dir=storage.temporary_directory()) as folder:
             path = Path(folder) / 'receipt.png'
             try:
                 with warnings.catch_warnings():

@@ -2,10 +2,11 @@
 
 These are standing user requirements for future work.
 
-## Both applications
+## Server, Local and Android
 
-- Implement every requested feature and relevant bug fix on both `server` and
-  `android-standalone`. Keep behavior and financial calculations consistent while
+- Track every requested feature and relevant bug fix on `server`, `local` and
+  `android-standalone`. Keep shared web changes synchronized into local. Explicitly
+  server-only features do not add a network server to Android. Keep behavior and financial calculations consistent while
   using each platform's own storage, authentication and interface.
 - Track completion separately for both branches. Report any platform-specific
   limitation or blocker explicitly; do not silently leave one implementation out.
@@ -67,8 +68,7 @@ These are standing user requirements for future work.
 
 ## Shared release numbering
 
-- The root `VERSION` file is the human-readable release number for both Docker/
-  server and Android. Keep its contents identical on both branches.
+- The root `VERSION` file is the human-readable release number for server, local and Android. Keep its contents identical on all three branches.
 - Android `versionName` reads this file; the server reads the packaged copy for
   its session metadata and visible version. Do not hardcode another UI version.
 - Android `versionCode` is a separate, monotonically increasing installation
@@ -80,4 +80,4 @@ These are standing user requirements for future work.
 
 - Assign a new shared version for every feature or fix: minor for new features
   (0.1.0 → 0.2.0), patch for fixes (0.2.0 → 0.2.1), major for breaking changes.
-  Update VERSION on both branches and the version-specific Android testing issue.
+  Update VERSION on all three branches and the version-specific Android testing issue.

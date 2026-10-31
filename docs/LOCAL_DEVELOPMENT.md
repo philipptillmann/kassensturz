@@ -124,3 +124,11 @@ passing. The full HTTP/OCR suite and browser acceptance have not run: this
 checkout environment lacks Flask, Waitress, pillow-heif, Node.js and Docker.
 Use the Python 3.12 setup above for further verification. The existing GitHub
 workflow remains manual-only; no hosted build or deployment was started.
+
+## Server security (1.0.0)
+
+The localhost launcher explicitly permits HTTP on loopback only. Production uses
+HTTPS by default; do not expose the local launcher/compose port to the network.
+[Optional SQLCipher encryption and server migration](SECURITY.md) apply to the
+server; encryption remains off in normal local development. Source installs need
+requirements-encryption.txt only if that optional mode is tested.

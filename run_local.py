@@ -24,6 +24,7 @@ def main():
     os.environ['APP_PASSWORD_FILE'] = str(password_file)
     # Ignore production PUBLIC_URL; requests must use their own local origin.
     os.environ['PUBLIC_URL'] = ''
+    os.environ['ALLOW_HTTP'] = '1'
 
     from server import create_app
     from waitress import serve

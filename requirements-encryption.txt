@@ -1,0 +1,2 @@
+# Optional for source installs; included in Linux server image. Install wheels only.
+sqlcipher3==0.6.4

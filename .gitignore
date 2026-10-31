@@ -3,7 +3,6 @@ data/*
 __pycache__/
 .DS_Store
 .venv/
-.local-data/
 .env
 .env.*
 !.env.example
@@ -12,3 +11,12 @@ secrets/
 *.db
 *.tar.gz
 *.zip
+
+*.key
+*.pem
+*.crt
+encrypted-data/
+
+.encrypted-deployment
+
+.local-data/

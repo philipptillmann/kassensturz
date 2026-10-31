@@ -4,7 +4,8 @@ import datetime
 import json
 from pathlib import Path
 import re
-import sqlite3
+import storage
+from storage import sqlite3
 import tempfile
 import zipfile
 
@@ -199,7 +200,7 @@ def _insert_metadata(meta, con):
 def staged_archive(stream, temp_dir=None):
     """Validate into an isolated database. Nothing touches the live dataset yet."""
     try:
-        with tempfile.TemporaryDirectory(prefix='kassensturz-restore-', dir=temp_dir) as folder:
+        with tempfile.TemporaryDirectory(prefix='kassensturz-restore-', dir=storage.temporary_directory(temp_dir)) as folder:
             stage = Path(folder) / 'staged.sqlite3'
             ledger.init(stage)
             with closing(ledger.connect(stage)) as con, con:
@@ -245,7 +246,7 @@ def preview(stream, temp_dir=None):
 def restore(stream, db):
     with staged_archive(stream, Path(db).parent) as (stage, summary):
         with closing(ledger.connect(db)) as con:
-            con.execute('ATTACH DATABASE ? AS restored', (str(stage),))
+            storage.attach(con, stage)
             with con:
                 con.execute('BEGIN IMMEDIATE')
                 con.execute('DELETE FROM csv_undo_entries')

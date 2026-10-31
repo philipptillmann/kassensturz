@@ -7,17 +7,18 @@ services:
     environment:
       APP_PASSWORD: ${LOCAL_APP_PASSWORD:?Set LOCAL_APP_PASSWORD (at least 12 characters)}
       PUBLIC_URL: ""
+      ALLOW_HTTP: "1"
     volumes:
       - local-data:/data
     read_only: true
     tmpfs:
-      - /tmp:size=256m,mode=1777
+      - /tmp:size=640m,mode=1777
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
     init: true
-    mem_limit: 768m
+    mem_limit: 1g
     pids_limit: 128
 volumes:
   local-data:
