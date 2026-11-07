@@ -58,7 +58,7 @@ def bounded_read(stream, maximum):
 
 
 def _insert_metadata(meta, con):
-    if not isinstance(meta, dict) or meta.get('format') != 'kassensturz-android' or type(meta.get('version')) is not int or meta['version'] not in (1, 2):
+    if not isinstance(meta, dict) or meta.get('format') != 'kassensturz-android' or type(meta.get('version')) is not int or meta['version'] not in (1, 2, 3):
         raise ValueError('Unbekanntes Kassensturz-Sicherungsformat.')
     cats, payments = names(meta['categories']), names(meta['payments'])
     if not cats:
@@ -105,12 +105,16 @@ def _insert_metadata(meta, con):
         if kind not in ('expense', 'income') or kind == 'income' and amount > 0:
             raise ValueError('Ungültige Buchungsart oder Einnahme.')
         notes, group = text(row['notes'], 10000), text(row['group'], 100)
+        expected = row.get('expected_contribution')
+        if expected is not None:
+            expected = integer(expected,0,99999999999)
+            if kind != 'expense' or amount >= 0: raise ValueError('Vereinbarter Beitrag nur bei Kostenbeitrag.')
         counterparty = text(row['counterparty'], 34)
         key = row.get('import_key')
         if key is not None:
             text(key, 512, False)
-        con.execute('INSERT INTO transactions(id,date,merchant,amount,category,import_key,group_name,payment_method,kind,notes,counterparty_iban) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-                    (txid,day,merchant,amount,category,key,group,payment,kind,notes,counterparty))
+        con.execute('INSERT INTO transactions(id,date,merchant,amount,category,import_key,group_name,payment_method,kind,notes,counterparty_iban,expected_contribution) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                    (txid,day,merchant,amount,category,key,group,payment,kind,notes,counterparty,expected))
         parts = row['parts']
         if not isinstance(parts, list) or len(parts) > 2000:
             raise ValueError('Zu viele Positionen.')

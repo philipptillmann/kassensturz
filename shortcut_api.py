@@ -128,7 +128,7 @@ def legacy_envelope(body):
     return parsed.date().isoformat(), ai, identity, canonical
 
 
-ENTRY_FIELDS = {'date','merchant','amount','currency','kind','category','payment_method','notes','group_name','items','request_id'}
+ENTRY_FIELDS = {'date','merchant','amount','currency','kind','category','payment_method','notes','group_name','items','request_id','expected_contribution'}
 
 def envelope(body):
     # Retain old clients and archived request fingerprints; new clients send entries directly.
@@ -218,10 +218,11 @@ def transaction(entry, day, con):
     kind = entry.get('kind', 'expense')
     if kind not in ('expense','income'):
         raise ValueError('kind muss expense oder income sein.')
-    mapped = {key:value for key,value in entry.items() if key not in ('merchant','kind')}
+    mapped = {key:value for key,value in entry.items() if key not in ('merchant','kind','expected_contribution')}
     mapped['title'] = entry['merchant']
     data = legacy_transaction(mapped, day, con, max_notes=4000)
     data['kind'] = kind
+    if 'expected_contribution' in entry: data['expected_contribution'] = entry['expected_contribution']
     return data
 
 

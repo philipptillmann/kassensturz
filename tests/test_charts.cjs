@@ -87,3 +87,20 @@ assert.equal(monthView([investment],'2026-10',true).length,0);
 assert.equal(aggregate([investment],{from:'2026-10',to:'2026-10'}).expenses,0);
 assert.equal(personalView([investment],[],false).length,0);
 console.log('Wealth transfers excluded from both reporting modes and charts.');
+
+// Agreed contribution is annotation only: full actual receipt reduces costs.
+{
+  const reports=require('../static/charts.js');
+  const purchase={id:901,date:'2026-11-06',merchant:'Present',amount:6000,kind:'expense',category:'Shopping',group_name:'Gift',items:[]};
+  const credit={...purchase,id:902,merchant:'Friend share',amount:-3500,expected_contribution:3000,notes:'Keep original note'};
+  const grouped=reports.monthView([purchase,credit],'2026-11',true);
+  assert.strictEqual(grouped.length,1);assert.strictEqual(grouped[0].amount,2500);
+  assert.strictEqual(reports.contributionDifference(credit),500);
+  assert.strictEqual(reports.contributionDifference({...credit,amount:-3000}),0);
+  assert.strictEqual(reports.contributionDifference({...credit,amount:-2000}),-1000);
+  assert.strictEqual(reports.contributionDifference({...credit,expected_contribution:null}),null);
+  assert.strictEqual(reports.monthView([purchase,{...credit,amount:-6500}],'2026-11',true)[0].amount,-500);
+  assert.strictEqual(reports.monthView([purchase,{...credit,date:'2026-12-01'}],'2026-12',true)[0].amount,-3500);
+  assert.strictEqual(credit.notes,'Keep original note');
+  console.log('Agreed contributions annotate overpayments without changing actual effective costs.');
+}

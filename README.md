@@ -583,3 +583,16 @@ settings are exposed. Existing keys work; revocation/password-change rules apply
 See the [server guide](https://github.com/philipptillmann/kassensturz/blob/server/docs/SHORTCUT_API.md).
 The standalone Android app remains offline; this server-only feature aligns its
 version/build metadata without adding an HTTP service.
+
+### Agreed contributions and overpayments (1.1.0)
+
+For a reimbursement/contribution enter the actual received amount (negative expense)
+and optionally the agreed contribution as a nonnegative EUR amount. The entry and
+group show agreed, received and the over/underpayment separately from free notes.
+A EUR 60 purchase plus EUR 35 received still costs EUR 25 effectively, even if the
+agreed contribution was EUR 30. No debt, repayment or income is invented. Upload
+the original receipt normally; OCR can explicitly populate the agreed amount for
+a contribution without replacing the actual amount. The agreed amount is entry-level
+metadata (also for split receipts), shown once per source entry in group details.
+New backups containing this metadata use format 3 so older apps reject rather than
+silently drop it; format 1/2 backups remain readable. Nothing is inferred for old entries.

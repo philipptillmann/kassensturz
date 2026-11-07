@@ -89,6 +89,7 @@ Die Buchungsfelder stehen direkt im JSON-Objekt:
 | `kind` | Nein | `expense` (Standard): Ausgaben positiv, Erstattungen/Beiträge negativ. `income`: Einnahme; Betrag wird wie im Buchungsformular als positiver Eingabebetrag erfasst und intern negativ gespeichert |
 | `category` | Nein | Vorhandene Kategorie; Standard ist die aktuelle Unkategorisiert-Kategorie. Gespeicherte Aliase umbenannter Standardkategorien funktionieren ebenfalls |
 | `payment_method` | Nein | Vorhandenes Zahlungsmittel wie `Bar`, `PayPal` oder ein eigener Bankname; Standard leer („Nicht angegeben“) |
+| `expected_contribution` | Nein | Vereinbarter Kostenbeitrag in EUR, nichtnegativ; nur bei `kind: "expense"` mit negativem tatsächlich erhaltenem `amount`. Dient nur zur Abweichungsnotiz, ändert den Betrag nicht |
 | `notes` | Nein | Freitext, bis 4.000 Zeichen |
 | `group_name` | Nein | Gruppenname, bis 80 Zeichen |
 | `items` | Nein | Bis 200 Positionen; siehe unten |
