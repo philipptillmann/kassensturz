@@ -300,13 +300,19 @@ class MainActivity : Activity() {
         if(effective) return report().filter { it.kind!="income" }.flatMap { r -> if(r.parts.isEmpty()) listOf(r.category to r.amount) else r.parts.map { it.category to it.amount } }.groupBy { it.first }.map { (k,v)->k to v.sumOf { it.second } }.filter { it.second!=0L }.sortedByDescending { it.second }
         return data.entries.filter { !it.wealthTransfer && it.date.startsWith(month.toString()) && it.kind!="income" }.flatMap { e -> if(e.parts.isEmpty()) listOf(e.category to e.amount) else e.parts.map { it.category to it.amount } }.groupBy { it.first }.map { (k,v)->k to v.sumOf { it.second } }.filter { it.second!=0L }.sortedByDescending { it.second }
     }
+    private fun contributionNote(e:Entry):String {
+        val expected=e.expectedContribution ?: return ""
+        val diff=Ledger.contributionDifference(e)!!
+        return "Vereinbart: ${money(expected)} · Eingegangen: ${money(-e.amount)} · "+if(diff>0) "Überzahlung / Abweichung: ${money(diff)} zu viel" else if(diff<0) "${money(-diff)} fehlen" else "Betrag stimmt"
+    }
     private fun entryRow(parent: LinearLayout,r: ReportRow) {
         val b=column(parent)
         label(b,r.name,17f,true)
         label(b,"${r.date} · ${r.category}${if(r.grouped) " · Gruppe" else ""}   ${money(r.amount)}",14f,color=if(r.amount<0)green else muted)
+        r.ids.mapNotNull { id->data.entries.find { it.id==id } }.map { contributionNote(it) }.filter { it.isNotEmpty() }.forEach { label(b,it,13f,color=muted) }
         b.setPadding(0,dp(6),0,dp(6));b.setOnClickListener {
             if(r.ids.size==1 && !r.grouped) data.entries.find { it.id==r.ids.first() }?.let { edit(it) }
-            else { val entries=r.ids.mapNotNull { id->data.entries.find { it.id==id } };AlertDialog.Builder(this).setTitle(r.name).setItems(entries.map { "${it.date} · ${it.merchant}${if(it.kind=="income") " (Einnahme)" else ""} · ${money(it.amount)}" }.toTypedArray()) { _,i->edit(entries[i]) }.setNegativeButton("Schließen",null).show() }
+            else { val entries=r.ids.mapNotNull { id->data.entries.find { it.id==id } };AlertDialog.Builder(this).setTitle(r.name).setItems(entries.map { "${it.date} · ${it.merchant}${if(it.kind=="income") " (Einnahme)" else ""} · ${money(it.amount)}\n${contributionNote(it)}" }.toTypedArray()) { _,i->edit(entries[i]) }.setNegativeButton("Schließen",null).show() }
         }
     }
     private fun transactions() {
@@ -405,6 +411,21 @@ class MainActivity : Activity() {
         val category=select(base,"Kategorie",data.categories,draft?.getString("category") ?: original?.category ?: "Unkategorisiert")
         val payment=select(base,"Zahlungsmittel",(listOf("")+data.payments+"Bar").distinct(),draft?.getString("payment") ?: original?.payment)
         val group=field(base,"Gruppe (optional)",draft?.getString("group") ?: original?.group ?: "")
+        val expectedBox=column(base)
+        val expected=field(expectedBox,"Vereinbarter Kostenbeitrag in Euro (optional)",draft?.getString("expected") ?: original?.expectedContribution?.let { amountText(it) } ?: "",true)
+        label(expectedBox,"Nur für Erstattung / Beitrag. Der tatsächlich erhaltene Betrag oben bleibt maßgeblich; Beleg-Sollbetrag hier eintragen.",13f,color=muted)
+        val contributionPreview=label(expectedBox,"",13f,color=muted)
+        fun updateContributionPreview() {
+            val contribution=type.selectedItemPosition==1
+            expectedBox.visibility=if(contribution) View.VISIBLE else View.GONE
+            val received=runCatching { Ledger.cents(amount.text.toString()) }.getOrNull()
+            val agreed=runCatching { Ledger.cents(expected.text.toString()) }.getOrNull()
+            contributionPreview.text=if(contribution && received!=null && agreed!=null && received>0 && agreed>=0) contributionNote(Entry(date="",merchant="",amount=-received,category="",expectedContribution=agreed)) else ""
+        }
+        val contributionWatcher=object:TextWatcher { override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){updateContributionPreview()};override fun afterTextChanged(e:Editable?){} }
+        expected.addTextChangedListener(contributionWatcher);amount.addTextChangedListener(contributionWatcher)
+        type.onItemSelectedListener=object:AdapterView.OnItemSelectedListener { override fun onItemSelected(p:AdapterView<*>?,v:View?,position:Int,id:Long){updateContributionPreview()};override fun onNothingSelected(p:AdapterView<*>?){} }
+        updateContributionPreview()
         val notes=field(base,"Notizen",draft?.getString("notes") ?: original?.notes ?: "",lines=3)
         val parts=mutableListOf<Part>().apply { addAll(original?.parts ?: emptyList()) }
         val partsBox=column(base)
@@ -448,10 +469,10 @@ class MainActivity : Activity() {
         }
         fun entry(): Entry {
             val value=Ledger.cents(amount.text.toString());require(value>0) { "Einen positiven Betrag eingeben; Art bestimmt das Vorzeichen." }
-            return Entry(id=original?.id ?: 0,date=LocalDate.parse(date.text.toString().trim()).toString(),merchant=merchant.text.toString().trim(),amount=if(type.selectedItemPosition==0)value else -value,category=category.selectedItem.toString(),payment=payment.selectedItem.toString(),kind=if(type.selectedItemPosition==2)"income" else "expense",notes=notes.text.toString(),group=group.text.toString().trim(),parts=parts.toList(),counterparty=original?.counterparty ?: "",importKey=original?.importKey).also { Ledger.validate(it) }
+            return Entry(id=original?.id ?: 0,date=LocalDate.parse(date.text.toString().trim()).toString(),merchant=merchant.text.toString().trim(),amount=if(type.selectedItemPosition==0)value else -value,category=category.selectedItem.toString(),payment=payment.selectedItem.toString(),kind=if(type.selectedItemPosition==2)"income" else "expense",notes=notes.text.toString(),group=group.text.toString().trim(),parts=parts.toList(),counterparty=original?.counterparty ?: "",importKey=original?.importKey,expectedContribution=if(type.selectedItemPosition==1 && expected.text.isNotBlank())Ledger.cents(expected.text.toString()) else null).also { Ledger.validate(it) }
         }
         fun draft() = Bundle().apply {
-            putLong("id",original?.id ?: 0);putString("type",type.selectedItem.toString());putString("date",date.text.toString());putString("merchant",merchant.text.toString());putString("amount",amount.text.toString());putString("category",category.selectedItem?.toString());putString("payment",payment.selectedItem?.toString());putString("group",group.text.toString());putString("notes",notes.text.toString());putString("photo",photo?.path);putBoolean("removeReceipt",removeReceipt)
+            putLong("id",original?.id ?: 0);putString("type",type.selectedItem.toString());putString("date",date.text.toString());putString("merchant",merchant.text.toString());putString("amount",amount.text.toString());putString("category",category.selectedItem?.toString());putString("payment",payment.selectedItem?.toString());putString("group",group.text.toString());putString("notes",notes.text.toString());putString("expected",expected.text.toString());putString("photo",photo?.path);putBoolean("removeReceipt",removeReceipt)
             putString("parts",org.json.JSONArray().apply { parts.forEach { p->put(org.json.JSONObject().put("name",p.name).put("amount",p.amount).put("category",p.category).put("group",p.group ?: org.json.JSONObject.NULL)) } }.toString())
         }
         fun showReceipt() { work({photo?.takeIf { it.exists() }?.readBytes() ?: if(!removeReceipt) original?.let { store.receipt(it.id) } else null}) { bytes ->
@@ -465,9 +486,9 @@ class MainActivity : Activity() {
             recognizer.process(InputImage.fromBitmap(bitmap,0)).addOnSuccessListener { text ->
                 if(!isDestroyed && editor===this@Editor) {
                     val f=form();val result=field(f,"Erkannter Text – bitte prüfen",text.text,lines=6)
-                    val total=Regex("(?im)(?:summe|gesamt|total)[^\\n]*?([0-9]+[,.][0-9]{2})").find(text.text)?.groupValues?.get(1)
-                    val choice=check(f,"Erkannten Gesamtbetrag übernehmen${total?.let { " ($it €)" } ?: " (nicht gefunden)"}",false);choice.isEnabled=total!=null
-                    dialog("Belegtext",f,"Übernehmen") { notes.setText((notes.text.toString()+"\n"+result.text.toString()).trim());if(choice.isChecked && total!=null)amount.setText(total) }
+                    val total=Regex("(?im)(?:summe|gesamt|total)[^\\n]*?([0-9]+(?:[. ][0-9]{3})*[,.][0-9]{2})(?![0-9])").find(text.text)?.groupValues?.get(1)
+                    val choice=check(f,"${if(type.selectedItemPosition==1) "Erkannten Betrag als vereinbarten Beitrag übernehmen" else "Erkannten Gesamtbetrag übernehmen"}${total?.let { " ($it €)" } ?: " (nicht gefunden)"}",false);choice.isEnabled=total!=null
+                    dialog("Belegtext",f,"Übernehmen") { notes.setText((notes.text.toString()+"\n"+result.text.toString()).trim());if(choice.isChecked && total!=null) { if(type.selectedItemPosition==1)expected.setText(amountText(BankCsv.amount(total))) else amount.setText(amountText(BankCsv.amount(total))) } }
                 }
             }.addOnFailureListener { if(!isDestroyed)toast("Texterkennung fehlgeschlagen: ${it.message}") }.addOnCompleteListener { busy=false;bitmap.recycle();recognizer.close() }
         } }

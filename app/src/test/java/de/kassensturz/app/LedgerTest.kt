@@ -5,6 +5,20 @@ import org.junit.Test
 
 class LedgerTest {
     private fun tx(id:Long=1,date:String="2026-10-01",amount:Long=10000,group:String="",kind:String="expense",parts:List<Part> = emptyList(),payment:String="Card") = Entry(id,date,"Example",amount,"Shopping",payment,kind,group=group,parts=parts)
+    @Test fun actualContributionReducesCostAndAgreementIsOnlyAnAnnotation() {
+        val purchase=Entry(id=100,date="2026-11-06",merchant="Present",amount=6000,category="Shopping",group="Gift")
+        val contribution=purchase.copy(id=101,merchant="Friend",amount=-3500,expectedContribution=3000,notes="Keep me")
+        Ledger.validate(contribution)
+        assertEquals(500L,Ledger.contributionDifference(contribution))
+        assertEquals(2500L,Ledger.rows(listOf(purchase,contribution),"2026-11",true).single().amount)
+        assertEquals(-500L,Ledger.rows(listOf(purchase,contribution.copy(amount=-6500)),"2026-11",true).single().amount)
+        assertEquals(-3500L,Ledger.rows(listOf(purchase,contribution.copy(date="2026-12-01")),"2026-12",true).single().amount)
+        assertEquals(0L,Ledger.contributionDifference(contribution.copy(amount=-3000)))
+        assertEquals(-1000L,Ledger.contributionDifference(contribution.copy(amount=-2000)))
+        assertEquals("Keep me",contribution.notes)
+        assertThrows(IllegalArgumentException::class.java) { Ledger.validate(contribution.copy(expectedContribution=-1)) }
+        assertThrows(IllegalArgumentException::class.java) { Ledger.validate(contribution.copy(kind="income")) }
+    }
     @Test fun decimalMoneyIsExactAndBounded() {
         assertEquals(1234L,Ledger.cents("12,34"));assertEquals(-1L,Ledger.cents("-0.01"))
         listOf("1,234","1.000,00","NaN","1e4","1000000000").forEach { raw->assertThrows(IllegalArgumentException::class.java) { Ledger.cents(raw) } }

@@ -10,7 +10,7 @@ data class Part(val name: String, val amount: Long, val category: String, val gr
 data class Entry(val id: Long = 0, val date: String, val merchant: String, val amount: Long,
     val category: String, val payment: String = "", val kind: String = "expense", val notes: String = "",
     val group: String = "", val parts: List<Part> = emptyList(), val receipt: Boolean = false,
-    val counterparty: String = "", val importKey: String? = null, val wealthTransfer: Boolean = false)
+    val counterparty: String = "", val importKey: String? = null, val wealthTransfer: Boolean = false, val expectedContribution: Long? = null)
 data class Account(val name: String, val share: Int = 10000, val shareIncome: Boolean = true, val iban: String = "")
 data class Transfer(val outgoing: Long, val incoming: Long)
 data class ReportRow(val date: String, val name: String, val amount: Long, val category: String, val kind: String,
@@ -26,7 +26,9 @@ object Ledger {
             require(it in -MAX_CENTS..MAX_CENTS) { "Betrag ist zu groß." }
         }
     }
+    fun contributionDifference(e:Entry):Long? = e.expectedContribution?.let { -e.amount-it }
     fun validate(entry: Entry) {
+        require(entry.expectedContribution==null || entry.kind=="expense" && entry.amount<0 && entry.expectedContribution in 0..MAX_CENTS) { "Vereinbarter Beitrag nur bei Erstattung / Kostenbeitrag, nichtnegativ." }
         require(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(entry.date)) { "Datum muss JJJJ-MM-TT sein." }
         LocalDate.parse(entry.date)
         require(entry.merchant.isNotBlank() && entry.merchant.length <= 200) { "Bezeichnung: 1–200 Zeichen." }

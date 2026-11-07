@@ -353,3 +353,16 @@ This does not encrypt Android storage or add a server dependency. Native runtime
 is unchanged; shared VERSION aligns to 1.0.0, with no new APK built.
 Development tracks server, local and android-standalone together; server-only
 features are explicitly documented instead of copied into the Android runtime.
+
+### Agreed contributions and overpayments (1.1.0)
+
+For a reimbursement/contribution enter the actual received amount (negative expense)
+and optionally the agreed contribution as a nonnegative EUR amount. The entry and
+group show agreed, received and the over/underpayment separately from free notes.
+A EUR 60 purchase plus EUR 35 received still costs EUR 25 effectively, even if the
+agreed contribution was EUR 30. No debt, repayment or income is invented. Upload
+the original receipt normally; OCR can explicitly populate the agreed amount for
+a contribution without replacing the actual amount. The agreed amount is entry-level
+metadata (also for split receipts), shown once per source entry in group details.
+New backups containing this metadata use format 3 so older apps reject rather than
+silently drop it; format 1/2 backups remain readable. Nothing is inferred for old entries.

@@ -152,10 +152,11 @@ object BankCsv {
     }
     fun export(entries: List<Entry>): String {
         fun cell(value: String) = "\""+value.replace("\"","\"\"")+"\""
-        val header=listOf("Datum","Bezeichnung","Betrag","Kategorie","Zahlungsmittel","Art","Gruppe","Notizen","Position","Positionsbetrag","Positionskategorie","Positionsgruppe")
+        val header=listOf("Datum","Bezeichnung","Betrag","Kategorie","Zahlungsmittel","Art","Gruppe","Notizen","Position","Positionsbetrag","Positionskategorie","Positionsgruppe","Vereinbarter Beitrag EUR","Abweichung EUR")
         return "\uFEFF"+(listOf(header)+entries.flatMap { e ->
             val base=listOf(e.date,e.merchant,java.math.BigDecimal(e.amount).movePointLeft(2).toPlainString().replace('.',','),e.category,e.payment,if(e.wealthTransfer)"wealth_transfer" else e.kind,e.group,e.notes)
-            if(e.parts.isEmpty()) listOf(base+listOf("","","","")) else e.parts.map { p -> base+listOf(p.name,java.math.BigDecimal(p.amount).movePointLeft(2).toPlainString().replace('.',','),p.category,p.group ?: "(geerbt)") }
+            val contribution=listOf(e.expectedContribution,Ledger.contributionDifference(e)).map { it?.let { cents->java.math.BigDecimal(cents).movePointLeft(2).toPlainString().replace('.',',') } ?: "" }
+            if(e.parts.isEmpty()) listOf(base+listOf("","","","")+contribution) else e.parts.map { p -> base+listOf(p.name,java.math.BigDecimal(p.amount).movePointLeft(2).toPlainString().replace('.',','),p.category,p.group ?: "(geerbt)")+contribution }
         }).joinToString("\r\n") { row -> row.joinToString(";") { cell(it) } }
     }
 }

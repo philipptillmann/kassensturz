@@ -13,6 +13,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.zip.ZipInputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -33,6 +34,29 @@ class StoreTest {
         db=Store(isolated,false)
     }
     @After fun tearDown() { db.close();folder.deleteRecursively() }
+    @Test fun testUpgradeFromFiveAddsNullableAgreementWithoutChangingMoney() {
+        SQLiteDatabase.create(null).use { sql ->
+            sql.execSQL("CREATE TABLE entries(id INTEGER PRIMARY KEY,amount INTEGER NOT NULL,notes TEXT NOT NULL)")
+            sql.execSQL("INSERT INTO entries VALUES (1,-3500,'Keep note')")
+            db.onUpgrade(sql,5,6)
+            sql.rawQuery("SELECT amount,notes,expected_contribution FROM entries",null).use { c ->assertTrue(c.moveToFirst());assertEquals(-3500L,c.getLong(0));assertEquals("Keep note",c.getString(1));assertTrue(c.isNull(2)) }
+        }
+    }
+    @Test fun testAgreedContributionSurvivesRestartReceiptAndBackup() {
+        val e=Entry(date="2026-11-06",merchant="Friend",amount=-3500,category="Shopping",group="Gift",notes="Keep free note",expectedContribution=3000)
+        val receipt=byteArrayOf(0xff.toByte(),0xd8.toByte(),1,2,3)
+        val id=db.save(e,receipt)
+        db.close();db=Store(isolated,false)
+        assertEquals(3000L,db.snapshot().entries.single().expectedContribution)
+        db.save(db.snapshot().entries.single().copy(amount=-4000))
+        val output=ByteArrayOutputStream();db.backup(output)
+        ZipInputStream(ByteArrayInputStream(output.toByteArray())).use { zip ->zip.nextEntry;val meta=org.json.JSONObject(zip.readBytes().toString(Charsets.UTF_8));assertEquals(3,meta.getInt("version")) }
+        db.restore(ByteArrayInputStream(output.toByteArray()))
+        val restored=db.snapshot().entries.single()
+        assertEquals(-4000L,restored.amount);assertEquals(3000L,restored.expectedContribution);assertEquals("Keep free note",restored.notes)
+        assertTrue(receipt.contentEquals(db.receipt(id)))
+        assertEquals(1000L,Ledger.contributionDifference(restored))
+    }
     @Test fun wealthSurvivesBackupAndBankLinksAreNotExpenses() {
         val today=java.time.LocalDate.now().toString()
         listOf("Giro" to 100000L,"Depot" to 0L).forEach { (name,value) ->
