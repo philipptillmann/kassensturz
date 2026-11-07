@@ -1,5 +1,10 @@
 /* Cent-based reporting, shared by the browser and Node checks. */
 (function(root){
+  function contributionDifference(tx){
+    if(tx.expected_contribution==null||tx.kind==='income')return null;
+    const actual=tx.original_amount??tx.amount;
+    return actual<0?-actual-tx.expected_contribution:null;
+  }
   function monthsBetween(from,to){
     if(!/^\d{4}-\d{2}$/.test(from)||!/^\d{4}-\d{2}$/.test(to)||from>to)return [];
     const [fy,fm]=from.split('-').map(Number),[ty,tm]=to.split('-').map(Number);
@@ -71,6 +76,6 @@
     const categoryRows=ranked(categories);
     return {months,monthly:[...monthly],categories:categoryRows,merchants:ranked(merchants),series:categoryRows.slice(0,5).map(([name])=>({name,values:[...series.get(name)]})),expenses,credits,income,net:expenses-credits};
   }
-  root.KassensturzReports={monthsBetween,aggregate,monthView,personalView};
+  root.KassensturzReports={contributionDifference,monthsBetween,aggregate,monthView,personalView};
   if(typeof module!=='undefined')module.exports=root.KassensturzReports;
 })(typeof window==='undefined'?globalThis:window);

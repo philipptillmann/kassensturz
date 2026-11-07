@@ -69,7 +69,7 @@ def write_archive(source, output, dataset=None):
             raise ValueError('Receipt images exceed the Android backup limits.')
         entries = []
         for row in con.execute('SELECT * FROM transactions ORDER BY date DESC,id DESC'):
-            entries.append(dict(id=row['id'], date=row['date'], merchant=row['merchant'], amount=row['amount'], category=row['category'], payment=row['payment_method'], kind=row['kind'], notes=row['notes'], group=row['group_name'], parts=parts.get(row['id'], []), receipt=row['id'] in receipt_ids, counterparty=row['counterparty_iban'], import_key=row['import_key']))
+            entries.append(dict(id=row['id'], date=row['date'], merchant=row['merchant'], amount=row['amount'], category=row['category'], payment=row['payment_method'], kind=row['kind'], notes=row['notes'], group=row['group_name'], parts=parts.get(row['id'], []), receipt=row['id'] in receipt_ids, counterparty=row['counterparty_iban'], import_key=row['import_key'],expected_contribution=row['expected_contribution'] if 'expected_contribution' in row.keys() else None))
         accounts = [dict(name=r['payment_method'], share=r['share_bp'], share_income=bool(r['share_income']), iban=r['iban']) for r in con.execute('SELECT * FROM account_settings')]
         def pairs(table):
             return [dict(outgoing=r['outgoing_id'], incoming=r['incoming_id'], **({'manual': r['manual']} if table == 'transfer_links' else {})) for r in con.execute('SELECT * FROM ' + table)]
@@ -91,6 +91,7 @@ def write_archive(source, output, dataset=None):
                 meta['wealth'] = json.loads(row[0])
                 if meta['wealth']['assets']:
                     meta['version'] = 2
+        if any(e.get('expected_contribution') is not None for e in entries): meta['version'] = 3
         meta['created_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         if dataset is not None:
             meta['dataset'] = dataset

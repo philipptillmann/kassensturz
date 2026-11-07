@@ -441,7 +441,7 @@ def create_app(password=None, public_url=None):
     def export():
         out = io.StringIO()
         writer = csv.writer(out, delimiter=';')
-        writer.writerow(['Datum', 'Händler', 'Betrag EUR', 'Kategorie', 'Position', 'Gruppe', 'Zahlungsmittel', 'Buchungstyp', 'Notizen'])
+        writer.writerow(['Datum', 'Händler', 'Betrag EUR', 'Kategorie', 'Position', 'Gruppe', 'Zahlungsmittel', 'Buchungstyp', 'Notizen', 'Vereinbarter Beitrag EUR', 'Abweichung EUR'])
         def safe(value):
             return "'" + value if value.startswith(('=', '+', '-', '@', '\t', '\r')) else value
         with data_connect() as con:
@@ -453,7 +453,9 @@ def create_app(password=None, public_url=None):
                                      f"{item['amount'] / 100:.2f}".replace('.', ','), safe(item['category']),
                                      safe(item['name']) if items else '',
                                      safe(transaction['group_name'] if not items or item['group_name'] is None else item['group_name']), safe(transaction['payment_method']),
-                                     'Vermögensumbuchung' if transaction['id'] in wealth_ids else 'Einnahme' if transaction['kind'] == 'income' else 'Ausgabe / Erstattung', safe(transaction['notes'])])
+                                     'Vermögensumbuchung' if transaction['id'] in wealth_ids else 'Einnahme' if transaction['kind'] == 'income' else 'Ausgabe / Erstattung', safe(transaction['notes']),
+                                     '' if transaction['expected_contribution'] is None else f"{transaction['expected_contribution']/100:.2f}".replace('.',','),
+                                     '' if transaction['expected_contribution'] is None else f"{(-transaction['amount']-transaction['expected_contribution'])/100:.2f}".replace('.',',')])
         response = make_response(('\ufeff' + out.getvalue()).encode())
         response.headers['Content-Type'] = 'text/csv; charset=utf-8'
         response.headers['Content-Disposition'] = f'attachment; filename=kassensturz-{g.dataset}.csv'

@@ -154,6 +154,15 @@ class ServerTests(unittest.TestCase):
         self.login(restarted)
         self.assertEqual(restarted.get('/api/data').json['transactions'][0]['amount'], 450)
 
+    def test_actual_contribution_and_agreed_share_are_returned_separately(self):
+        csrf=self.login()
+        data=dict(date='2026-11-06',merchant='Friend share',amount='-35',expected_contribution='30',category='Shopping',notes='Original note',group_name='Gift')
+        result=self.post('/api/transaction',data,csrf);self.assertEqual(result.status_code,200,result.json)
+        row=self.client.get('/api/data').json['transactions'][0]
+        self.assertEqual((row['amount'],row['expected_contribution'],row['notes']),(-3500,3000,'Original note'))
+        self.assertEqual(self.post('/api/transaction',{**data,'expected_contribution':'-5'},csrf).status_code,400)
+        self.assertEqual(len(self.client.get('/api/data').json['transactions']),1)
+
     def test_unified_payment_editor_api_preserves_names_and_bank_settings(self):
         csrf=self.login()
         self.assertEqual(self.post('/api/payment',dict(name='Shared',kind='bank',share_percent='50'),csrf).status_code,200)

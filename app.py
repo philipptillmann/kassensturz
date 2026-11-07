@@ -50,6 +50,8 @@ def init(db=None):
             c.execute("ALTER TABLE transactions ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
         if 'counterparty_iban' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
             c.execute("ALTER TABLE transactions ADD COLUMN counterparty_iban TEXT NOT NULL DEFAULT ''")
+        if 'expected_contribution' not in {row['name'] for row in c.execute('PRAGMA table_info(transactions)')}:
+            c.execute('ALTER TABLE transactions ADD COLUMN expected_contribution INTEGER')
         for name in CATEGORIES:
             if not c.execute('SELECT 1 FROM category_aliases WHERE alias=?', (name,)).fetchone():
                 c.execute('INSERT OR IGNORE INTO categories VALUES (?)', (name,))
@@ -102,6 +104,15 @@ def read_csv(text):
     rows = list(reader)
     if not reader.fieldnames or not rows: raise ValueError('CSV enthält keine Buchungen.')
     return reader.fieldnames, rows
+
+def expected_contribution(value, amount, kind):
+    if value is None or value == '': return None
+    if isinstance(value, bool) or not isinstance(value, (str,int,float)):
+        raise ValueError('Vereinbarten Beitrag als EUR-Betrag angeben.')
+    result = cents(value)
+    if not 0 <= result <= 99999999999 or kind != 'expense' or amount >= 0:
+        raise ValueError('Vereinbarter Beitrag: nichtnegativer Betrag nur bei Erstattung / Kostenbeitrag.')
+    return result
 
 def save_transaction(d, db=None, *, _connection=None):
     receipt = None
@@ -157,7 +168,7 @@ def save_transaction(d, db=None, *, _connection=None):
             group_name = group_name.strip()
         if d.get('id'):
             txid = int(d['id'])
-            existing = c.execute('SELECT group_name,payment_method,notes FROM transactions WHERE id=?',(txid,)).fetchone()
+            existing = c.execute('SELECT group_name,payment_method,notes,expected_contribution FROM transactions WHERE id=?',(txid,)).fetchone()
             if not existing: raise ValueError('Buchung nicht gefunden.')
             if 'group_name' not in d:
                 group_name = existing['group_name']
@@ -165,14 +176,17 @@ def save_transaction(d, db=None, *, _connection=None):
                 payment = existing['payment_method']
             if 'notes' not in d:
                 notes = existing['notes']
+            prior_expected = existing['expected_contribution'] if kind == 'expense' and amount < 0 else None
             c.execute('UPDATE transactions SET date=?,merchant=?,amount=?,category=? WHERE id=?',(date,merchant,amount,d['category'],txid))
             c.execute('DELETE FROM items WHERE transaction_id=?',(txid,))
         else:
+            prior_expected = None
             txid = c.execute('INSERT INTO transactions(date,merchant,amount,category) VALUES (?,?,?,?)',(date,merchant,amount,d['category'])).lastrowid
         c.execute('UPDATE transactions SET group_name=? WHERE id=?', (group_name or '', txid))
         c.execute('UPDATE transactions SET payment_method=? WHERE id=?', (payment or '', txid))
         c.execute('UPDATE transactions SET kind=? WHERE id=?', (kind, txid))
-        c.execute('UPDATE transactions SET notes=? WHERE id=?', (notes or '', txid))
+        expected = expected_contribution(d['expected_contribution'], amount, kind) if 'expected_contribution' in d else prior_expected
+        c.execute('UPDATE transactions SET notes=?,expected_contribution=? WHERE id=?', (notes or '', expected, txid))
         c.executemany('INSERT INTO items(transaction_id,name,amount,category,group_name) VALUES (?,?,?,?,?)',[(txid,*x) for x in converted])
         if receipt is not None:
             c.execute('INSERT INTO receipt_images(transaction_id,image) VALUES (?,?) ON CONFLICT(transaction_id) DO UPDATE SET image=excluded.image', (txid, receipt))
