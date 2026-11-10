@@ -28,3 +28,5 @@
 
 !storage.py
 !requirements-encryption.txt
+
+!localization.py

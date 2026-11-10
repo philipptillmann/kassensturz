@@ -87,7 +87,8 @@ def create_app(password=None, public_url=None):
     login_lock = threading.Lock()
 
     def failure(message, status=400):
-        return jsonify(error=message), status
+        from localization import translate_message
+        return jsonify(error=translate_message(message, request.cookies.get('kassensturz_language', 'de'))), status
 
     @web.before_request
     def access_control():
@@ -125,7 +126,7 @@ def create_app(password=None, public_url=None):
                 return failure('Ungültiger Ursprung. Bitte die konfigurierte Serveradresse verwenden.', 403)
             if not request.is_json and not (backup_upload and request.mimetype in ('application/zip', 'application/octet-stream')):
                 return failure('JSON oder eine ZIP-Sicherung erwartet.' if backup_upload else 'JSON erwartet.', 415)
-        public_paths = {'/login', '/login.js', '/style.css', '/api/login', '/api/auth-status', '/healthz', '/manifest.webmanifest',
+        public_paths = {'/login', '/login.js', '/i18n.js', '/translations.js', '/manual/en', '/manual/de', '/style.css', '/api/login', '/api/auth-status', '/healthz', '/manifest.webmanifest',
                         '/icons/icon.svg', '/icons/icon-180.png', '/icons/icon-192.png', '/icons/icon-512.png'}
         if request.path in public_paths:
             return None
@@ -204,6 +205,18 @@ def create_app(password=None, public_url=None):
     def login_page():
         return send_from_directory(ledger.ROOT / 'static', 'login.html')
 
+    @web.get('/translations.js')
+    def translations():
+        payload = (ledger.ROOT / 'static' / 'locales' / 'en.json').read_text(encoding='utf-8')
+        return web.response_class('window.KassensturzEnglish = ' + payload + ';', mimetype='text/javascript')
+
+    @web.get('/manual/<language>')
+    def user_manual(language):
+        if language not in ('de', 'en'):
+            return failure('Not found', 404)
+        return send_from_directory(ledger.ROOT / 'static' / 'manual', language + '.html')
+
+    @web.get('/i18n.js')
     @web.get('/login.js')
     @web.get('/style.css')
     @web.get('/manifest.webmanifest')
