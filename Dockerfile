@@ -15,7 +15,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt requirements-encryption.txt VERSION ./
 RUN pip install --only-binary=:all: --no-cache-dir -r requirements.txt -r requirements-encryption.txt
-COPY storage.py app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py backups.py shortcut_api.py wealth.py ./
+COPY localization.py storage.py app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py backups.py shortcut_api.py wealth.py ./
 COPY sample-data ./sample-data
 COPY static ./static
 COPY tests ./tests

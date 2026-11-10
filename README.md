@@ -596,3 +596,9 @@ a contribution without replacing the actual amount. The agreed amount is entry-l
 metadata (also for split receipts), shown once per source entry in group details.
 New backups containing this metadata use format 3 so older apps reject rather than
 silently drop it; format 1/2 backups remain readable. Nothing is inferred for old entries.
+
+## User manuals / Benutzerhandbücher (1.2.0)
+
+[English user manual](docs/USER_MANUAL_EN.md) · [Deutsches Benutzerhandbuch](docs/USER_MANUAL_DE.md).
+Choose Deutsch or English in Settings / Sprache unter Einstellungen auswählen.
+The preference belongs to this browser/device; saved names and notes stay unchanged.

@@ -12,7 +12,7 @@ form.addEventListener('submit', async event => {
                             remember: document.getElementById('remember').checked})
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Anmeldung fehlgeschlagen.');
+    if (!response.ok) throw new Error(data.error || I18n.t('Anmeldung fehlgeschlagen.'));
     window.location.replace('/');
   } catch (exception) {
     error.textContent = exception.message;
@@ -25,5 +25,5 @@ fetch('/api/auth-status').then(r=>{if(!r.ok)throw new Error();return r.json()}).
   document.getElementById('username').hidden=data.needs_migration;
   document.getElementById('usernameLabel').hidden=data.needs_migration;
   document.getElementById('username').required=!data.needs_migration;
-  document.getElementById('loginHint').textContent=data.needs_migration?'Mit dem bisherigen App-Passwort anmelden. Danach unter Einstellungen das erste Benutzerkonto anlegen.':'';
-}).catch(()=>{document.getElementById('error').textContent='Anmeldeeinstellungen konnten nicht geladen werden. Bitte neu laden.'});
+  document.getElementById('loginHint').textContent=data.needs_migration?I18n.t('Mit dem bisherigen App-Passwort anmelden. Danach unter Einstellungen das erste Benutzerkonto anlegen.'):'';
+}).catch(()=>{document.getElementById('error').textContent=I18n.t('Anmeldeeinstellungen konnten nicht geladen werden. Bitte neu laden.')});
