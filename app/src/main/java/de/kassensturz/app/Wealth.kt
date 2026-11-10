@@ -9,23 +9,23 @@ import java.time.LocalDate
 
 internal fun JSONArray.rows(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }
 internal fun JSONObject.num(key: String): Long {
-    require(Regex("-?[0-9]+").matches(get(key).toString())) { "Ungültige Ganzzahl: $key" }
+    require(Regex("-?[0-9]+").matches(get(key).toString())) { ("" + L10n.t("Ungültige Ganzzahl: ") + (key)) }
     return get(key).toString().toLong()
 }
 
 /** Portable wealth document, also used by the server backup format. */
 object Wealth {
     const val MAX = 99999999999L
-    val types = linkedMapOf("cash" to "Giro / Verrechnungskonto", "brokerage" to "Aktiendepot", "building" to "Bausparvertrag", "fixed" to "Festgeld", "savings" to "Tagesgeld", "other" to "Sonstiges")
+    val types get() = linkedMapOf("cash" to "Giro / Verrechnungskonto", "brokerage" to "Aktiendepot", "building" to "Bausparvertrag", "fixed" to "Festgeld", "savings" to "Tagesgeld", "other" to "Sonstiges").mapValues { L10n.t(it.value) }
     fun empty() = JSONObject().put("version",1).put("assets",JSONArray()).put("plans",JSONArray()).put("events",JSONArray())
     fun assets(d: JSONObject) = d.getJSONArray("assets").rows()
     fun plans(d: JSONObject) = d.getJSONArray("plans").rows()
     fun events(d: JSONObject) = d.getJSONArray("events").rows()
-    private fun number(n: Long, low: Long=0, high: Long=MAX): Long { require(n in low..high) { "Vermögenswert außerhalb des zulässigen Bereichs." };return n }
-    private fun text(raw: String, limit: Int=100, required: Boolean=true) { require(raw.length<=limit && '\u0000' !in raw && (!required || raw.isNotBlank())) { "Bezeichnung fehlt oder ist zu lang." } }
-    private fun day(raw: String): String { require(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(raw)) { "Datum als JJJJ-MM-TT eingeben." };LocalDate.parse(raw);return raw }
+    private fun number(n: Long, low: Long=0, high: Long=MAX): Long { require(n in low..high) { L10n.t("Vermögenswert außerhalb des zulässigen Bereichs.") };return n }
+    private fun text(raw: String, limit: Int=100, required: Boolean=true) { require(raw.length<=limit && '\u0000' !in raw && (!required || raw.isNotBlank())) { L10n.t("Bezeichnung fehlt oder ist zu lang.") } }
+    private fun day(raw: String): String { require(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(raw)) { L10n.t("Datum als JJJJ-MM-TT eingeben.") };LocalDate.parse(raw);return raw }
     fun scaled(raw: String, places: Int=2): Long {
-        require(Regex("-?[0-9]+([.,][0-9]+)?").matches(raw.trim())) { "Zahl ohne Tausendertrennzeichen eingeben." }
+        require(Regex("-?[0-9]+([.,][0-9]+)?").matches(raw.trim())) { L10n.t("Zahl ohne Tausendertrennzeichen eingeben.") }
         return BigDecimal(raw.trim().replace(',','.')).movePointRight(places).longValueExact()
     }
     fun decimal(n: Long, places: Int=2) = BigDecimal(n).movePointLeft(places).toPlainString()
@@ -34,14 +34,14 @@ object Wealth {
     fun linked(d: JSONObject): Set<Long> = events(d).flatMap { e -> val a=e.getJSONArray("entries");(0 until a.length()).map { a.getLong(it) } }.toSet()
     fun asset(d: JSONObject, id: Long) = assets(d).find { it.num("id")==id }
     fun validate(d: JSONObject): JSONObject {
-        require(d.num("version")==1L && assets(d).size<=100 && plans(d).size<=200 && events(d).size<=10000) { "Unbekanntes oder zu großes Vermögensformat." }
+        require(d.num("version")==1L && assets(d).size<=100 && plans(d).size<=200 && events(d).size<=10000) { L10n.t("Unbekanntes oder zu großes Vermögensformat.") }
         val ids=mutableSetOf<Long>();val names=mutableSetOf<String>()
         assets(d).forEach { a ->
-            require(ids.add(number(a.num("id"),1)) && a.getString("type") in types) { "Ungültige Anlage." }
+            require(ids.add(number(a.num("id"),1)) && a.getString("type") in types) { L10n.t("Ungültige Anlage.") }
             text(a.getString("name"));number(a.num("rate_bp"),-10000,10000)
-            require(names.add(a.getString("name").trim().lowercase(java.util.Locale.ROOT))) { "Anlagenamen müssen eindeutig sein." }
+            require(names.add(a.getString("name").trim().lowercase(java.util.Locale.ROOT))) { L10n.t("Anlagenamen müssen eindeutig sein.") }
             if(a.getString("maturity").isNotEmpty()) day(a.getString("maturity"))
-            else require(a.getString("type")!="fixed") { "Für Festgeld ein Laufzeitende angeben." }
+            else require(a.getString("type")!="fixed") { L10n.t("Für Festgeld ein Laufzeitende angeben.") }
             val snapshots=a.getJSONArray("snapshots").rows();require(snapshots.size in 1..1000 && snapshots.map { it.getString("date") }.distinct().size==snapshots.size)
             snapshots.forEach { s -> day(s.getString("date"));number(s.num("value"));number(s.num("seq")) }
             val positions=a.getJSONArray("positions").rows();require(positions.size<=100 && positions.map { it.getString("name") }.distinct().size==positions.size)
@@ -52,7 +52,7 @@ object Wealth {
         }
         val planIds=mutableSetOf<Long>()
         plans(d).forEach { p ->
-            require(planIds.add(number(p.num("id"),1)) && p.num("from") in ids && p.num("to") in ids && p.num("from")!=p.num("to")) { "Ungültiger Dauerauftrag." }
+            require(planIds.add(number(p.num("id"),1)) && p.num("from") in ids && p.num("to") in ids && p.num("from")!=p.num("to")) { L10n.t("Ungültiger Dauerauftrag.") }
             text(p.getString("name"));number(p.num("amount"),1);number(p.num("every"),1,12);day(p.getString("start"))
             val end=p.getString("end");require(end.isEmpty() || day(end)>=p.getString("start"));require(p.get("enabled") is Boolean)
         }
@@ -66,7 +66,7 @@ object Wealth {
             repeat(entries.length()) { i -> require(kind=="transfer" && linked.add(number(entries.getLong(i),1))) }
         }
         val maximum=eventIds.maxOrNull() ?: 0L
-        require(assets(d).all { a -> a.getJSONArray("snapshots").rows().all { it.num("seq")<=maximum } }) { "Bestandswert verweist auf unbekannte Buchungsfolge." }
+        require(assets(d).all { a -> a.getJSONArray("snapshots").rows().all { it.num("seq")<=maximum } }) { L10n.t("Bestandswert verweist auf unbekannte Buchungsfolge.") }
         assets(d).forEach { a -> number(holdings(a));number(cash(d,a));number(cash(d,a)+holdings(a)) }
         return d
     }
@@ -94,26 +94,26 @@ object Wealth {
             val date=start.plusMonths(i*p.num("every")).toString();if(date>until || end.isNotEmpty() && date>end)return result
             if(date>after)result.add(date)
         }
-        error("Dauerauftrag umfasst mehr als 1200 Termine.")
+        error(L10n.t("Dauerauftrag umfasst mehr als 1200 Termine."))
     }
     private fun post(d: JSONObject, c: JSONObject, today: String) {
         val e=JSONObject().put("id",next(events(d))).put("date",day(c.getString("date"))).put("kind",c.getString("kind")).put("amount",number(c.num("amount"),1))
             .put("from",c.optLong("from",0)).put("to",c.num("to")).put("note",c.optString("note","")).put("plan",c.optLong("plan",0)).put("entries",c.optJSONArray("entries") ?: JSONArray())
-        require(e.getString("date")<=today) { "Zukünftige Buchungen als Dauerauftrag planen." }
-        val a=asset(d,if(e.getString("kind")=="transfer")e.num("from") else e.num("to")) ?: error("Quellanlage fehlt.")
-        val target=asset(d,e.num("to")) ?: error("Zielanlage fehlt.")
-        require(listOf(a,target).none { item -> item.getJSONArray("snapshots").rows().any { it.getString("date")>e.getString("date") } }) { "Bewegung liegt vor einem neueren Bestandswert. Historische Korrekturen über Bestandswerte erfassen." }
-        require(listOf(a,target).all { it.getJSONArray("snapshots").rows().any { s -> s.getString("date")<=e.getString("date") } }) { "Anfangsbestand zum Buchungsdatum fehlt." }
-        require(e.getString("kind") !in listOf("transfer","fee","buy") || cash(d,a,e.getString("date"))>=e.num("amount")) { "Quellguthaben reicht nicht aus." }
+        require(e.getString("date")<=today) { L10n.t("Zukünftige Buchungen als Dauerauftrag planen.") }
+        val a=asset(d,if(e.getString("kind")=="transfer")e.num("from") else e.num("to")) ?: error(L10n.t("Quellanlage fehlt."))
+        val target=asset(d,e.num("to")) ?: error(L10n.t("Zielanlage fehlt."))
+        require(listOf(a,target).none { item -> item.getJSONArray("snapshots").rows().any { it.getString("date")>e.getString("date") } }) { L10n.t("Bewegung liegt vor einem neueren Bestandswert. Historische Korrekturen über Bestandswerte erfassen.") }
+        require(listOf(a,target).all { it.getJSONArray("snapshots").rows().any { s -> s.getString("date")<=e.getString("date") } }) { L10n.t("Anfangsbestand zum Buchungsdatum fehlt.") }
+        require(e.getString("kind") !in listOf("transfer","fee","buy") || cash(d,a,e.getString("date"))>=e.num("amount")) { L10n.t("Quellguthaben reicht nicht aus.") }
         d.getJSONArray("events").put(e);validate(d)
         val checkDates=events(d).map { it.getString("date") }.filter { it>=e.getString("date") }+today
-        require(assets(d).all { item -> checkDates.all { cash(d,item,it)>=0 } }) { "Buchung würde ein späteres Guthaben überziehen." }
+        require(assets(d).all { item -> checkDates.all { cash(d,item,it)>=0 } }) { L10n.t("Buchung würde ein späteres Guthaben überziehen.") }
     }
     fun apply(source: JSONObject, c: JSONObject, today: String=LocalDate.now().toString()): JSONObject {
         val d=JSONObject(source.toString())
         when(c.getString("op")) {
             "asset" -> {
-                val old=asset(d,c.optLong("id",0));require(c.optLong("id",0)==0L || old!=null) { "Anlage fehlt." }
+                val old=asset(d,c.optLong("id",0));require(c.optLong("id",0)==0L || old!=null) { L10n.t("Anlage fehlt.") }
                 val a=if(old==null) JSONObject().put("id",next(assets(d))).put("snapshots",JSONArray()).put("positions",JSONArray()) else JSONObject(old.toString())
                 a.put("name",c.getString("name").trim()).put("type",c.getString("type")).put("rate_bp",c.num("rate_bp")).put("maturity",c.optString("maturity",""))
                 if(c.has("value")) {
@@ -124,24 +124,24 @@ object Wealth {
                 replace(d,"assets",old,a)
             }
             "delete-asset" -> {
-                val id=c.num("id");require((events(d)+plans(d)).none { it.num("from")==id || it.num("to")==id }) { "Anlagen mit Bewegungen oder Daueraufträgen bleiben für die Historie erhalten." }
+                val id=c.num("id");require((events(d)+plans(d)).none { it.num("from")==id || it.num("to")==id }) { L10n.t("Anlagen mit Bewegungen oder Daueraufträgen bleiben für die Historie erhalten.") }
                 d.put("assets",JSONArray(assets(d).filter { it.num("id")!=id }))
             }
             "plan" -> {
                 val old=plans(d).find { it.num("id")==c.optLong("id",0) }
                 val p=JSONObject();listOf("name","from","to","amount","every","start","end","enabled").forEach { p.put(it,c.get(it)) };p.put("id",old?.num("id") ?: next(plans(d)))
-                require(old==null || events(d).none { it.num("plan")==old.num("id") } || listOf("start","every","from","to").all { p.get(it).toString()==old.get(it).toString() }) { "Gebuchten Dauerauftrag pausieren und neuen anlegen." }
+                require(old==null || events(d).none { it.num("plan")==old.num("id") } || listOf("start","every","from","to").all { p.get(it).toString()==old.get(it).toString() }) { L10n.t("Gebuchten Dauerauftrag pausieren und neuen anlegen.") }
                 replace(d,"plans",old,p)
             }
             "event" -> post(d,c,today)
             "link" -> {
-                val e=events(d).find { it.num("id")==c.num("id") && it.getString("kind")=="transfer" } ?: error("Umbuchung fehlt.")
+                val e=events(d).find { it.num("id")==c.num("id") && it.getString("kind")=="transfer" } ?: error(L10n.t("Umbuchung fehlt."))
                 e.put("entries",c.getJSONArray("entries"))
             }
             "delete-position" -> {
-                val a=asset(d,c.num("id")) ?: error("Depot fehlt.");val positions=a.getJSONArray("positions").rows()
-                val p=positions.find { it.getString("name")==c.getString("name") } ?: error("Position fehlt.")
-                require(p.num("units")==0L) { "Vor dem Entfernen Bestand auf null setzen oder Position verkaufen." }
+                val a=asset(d,c.num("id")) ?: error(L10n.t("Depot fehlt."));val positions=a.getJSONArray("positions").rows()
+                val p=positions.find { it.getString("name")==c.getString("name") } ?: error(L10n.t("Position fehlt."))
+                require(p.num("units")==0L) { L10n.t("Vor dem Entfernen Bestand auf null setzen oder Position verkaufen.") }
                 a.put("positions",JSONArray(positions.filter { it!==p }))
             }
             "run-plans" -> {
@@ -150,19 +150,19 @@ object Wealth {
                 due.forEach { (date,p) -> post(d,JSONObject().put("date",date).put("kind","transfer").put("amount",p.num("amount")).put("from",p.num("from")).put("to",p.num("to")).put("note",p.getString("name")).put("plan",p.num("id")),today) }
             }
             "position", "trade" -> {
-                val a=asset(d,c.num("id")) ?: error("Depot fehlt.");require(a.getString("type")=="brokerage")
+                val a=asset(d,c.num("id")) ?: error(L10n.t("Depot fehlt."));require(a.getString("type")=="brokerage")
                 val positions=a.getJSONArray("positions").rows().toMutableList();val old=positions.find { it.getString("name")==c.getString("name") }
                 val p=JSONObject();listOf("name","symbol","units","price","date").forEach { p.put(it,c.get(it)) };require(day(p.getString("date"))<=today)
                 if(c.getString("op")=="trade") {
-                    require(p.getString("date")==today) { "Wertpapierhandel zunächst nur mit heutigem Datum erfassen; historische Bestände über Bestandskorrektur setzen." }
+                    require(p.getString("date")==today) { L10n.t("Wertpapierhandel zunächst nur mit heutigem Datum erfassen; historische Bestände über Bestandskorrektur setzen.") }
                     val units=number(p.num("units"),1,1000000000000);val price=number(p.num("price"),1,1000000000000);val sell=c.optBoolean("sell",false)
-                    require(!sell || (old?.num("units") ?: 0)>=units) { "Nicht genügend Wertpapieranteile." }
+                    require(!sell || (old?.num("units") ?: 0)>=units) { L10n.t("Nicht genügend Wertpapieranteile.") }
                     post(d,JSONObject().put("date",p.getString("date")).put("kind",if(sell)"sell" else "buy").put("amount",round(BigInteger.valueOf(units).multiply(BigInteger.valueOf(price)),10000000000)).put("to",a.num("id")).put("note",(if(sell)"Verkauf " else "Kauf ")+p.getString("name")),today)
                     p.put("units",(old?.num("units") ?: 0)+if(sell)-units else units)
                 }
                 if(old==null)positions.add(p) else positions[positions.indexOf(old)]=p;a.put("positions",JSONArray(positions))
             }
-            else -> error("Unbekannte Vermögensaktion.")
+            else -> error(L10n.t("Unbekannte Vermögensaktion."))
         }
         return validate(d)
     }

@@ -21,27 +21,27 @@ object Ledger {
     const val MAX_CENTS = 99999999999L
     fun cents(raw: String): Long {
         val value = raw.trim().replace("€", "").replace(" ", "")
-        require(Regex("[+-]?[0-9]+([.,][0-9]{1,2})?").matches(value)) { "Betrag z. B. 12,50 eingeben (ohne Tausendertrennzeichen)." }
+        require(Regex("[+-]?[0-9]+([.,][0-9]{1,2})?").matches(value)) { L10n.t("Betrag z. B. 12,50 eingeben (ohne Tausendertrennzeichen).") }
         return BigDecimal(value.replace(',', '.')).movePointRight(2).longValueExact().also {
-            require(it in -MAX_CENTS..MAX_CENTS) { "Betrag ist zu groß." }
+            require(it in -MAX_CENTS..MAX_CENTS) { L10n.t("Betrag ist zu groß.") }
         }
     }
     fun contributionDifference(e:Entry):Long? = e.expectedContribution?.let { -e.amount-it }
     fun validate(entry: Entry) {
-        require(entry.expectedContribution==null || entry.kind=="expense" && entry.amount<0 && entry.expectedContribution in 0..MAX_CENTS) { "Vereinbarter Beitrag nur bei Erstattung / Kostenbeitrag, nichtnegativ." }
-        require(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(entry.date)) { "Datum muss JJJJ-MM-TT sein." }
+        require(entry.expectedContribution==null || entry.kind=="expense" && entry.amount<0 && entry.expectedContribution in 0..MAX_CENTS) { L10n.t("Vereinbarter Beitrag nur bei Erstattung / Kostenbeitrag, nichtnegativ.") }
+        require(Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}").matches(entry.date)) { L10n.t("Datum muss JJJJ-MM-TT sein.") }
         LocalDate.parse(entry.date)
-        require(entry.merchant.isNotBlank() && entry.merchant.length <= 200) { "Bezeichnung: 1–200 Zeichen." }
-        require(entry.amount in -MAX_CENTS..MAX_CENTS && entry.amount != 0L) { "Betrag darf nicht null sein." }
-        require(entry.kind in listOf("expense", "income")) { "Unbekannte Buchungsart." }
-        require(entry.kind != "income" || entry.amount < 0) { "Einnahmen als positiven Eingabebetrag erfassen." }
-        require(entry.category.isNotBlank() && entry.category.length <= 60) { "Kategorie fehlt." }
-        require(entry.payment.length <= 60 && entry.group.length <= 100 && entry.notes.length <= 10000) { "Text ist zu lang." }
-        require(entry.parts.size <= 200) { "Höchstens 200 Positionen." }
-        require(entry.parts.isEmpty() || entry.parts.sumOf { it.amount } == entry.amount) { "Die Summe der Positionen muss dem Gesamtbetrag entsprechen." }
+        require(entry.merchant.isNotBlank() && entry.merchant.length <= 200) { L10n.t("Bezeichnung: 1–200 Zeichen.") }
+        require(entry.amount in -MAX_CENTS..MAX_CENTS && entry.amount != 0L) { L10n.t("Betrag darf nicht null sein.") }
+        require(entry.kind in listOf("expense", "income")) { L10n.t("Unbekannte Buchungsart.") }
+        require(entry.kind != "income" || entry.amount < 0) { L10n.t("Einnahmen als positiven Eingabebetrag erfassen.") }
+        require(entry.category.isNotBlank() && entry.category.length <= 60) { L10n.t("Kategorie fehlt.") }
+        require(entry.payment.length <= 60 && entry.group.length <= 100 && entry.notes.length <= 10000) { L10n.t("Text ist zu lang.") }
+        require(entry.parts.size <= 200) { L10n.t("Höchstens 200 Positionen.") }
+        require(entry.parts.isEmpty() || entry.parts.sumOf { it.amount } == entry.amount) { L10n.t("Die Summe der Positionen muss dem Gesamtbetrag entsprechen.") }
         entry.parts.forEach {
-            require(it.name.isNotBlank() && it.name.length <= 200 && it.category.isNotBlank() && it.category.length <= 60 && (it.group?.length ?: 0) <= 100) { "Ungültige Position." }
-            require(it.amount in -MAX_CENTS..MAX_CENTS) { "Positionsbetrag zu groß." }
+            require(it.name.isNotBlank() && it.name.length <= 200 && it.category.isNotBlank() && it.category.length <= 60 && (it.group?.length ?: 0) <= 100) { L10n.t("Ungültige Position.") }
+            require(it.amount in -MAX_CENTS..MAX_CENTS) { L10n.t("Positionsbetrag zu groß.") }
         }
     }
     private fun scale(value: Long, share: Int) = BigDecimal(value).multiply(BigDecimal(share)).divide(BigDecimal(10000), 0, RoundingMode.HALF_UP).longValueExact()

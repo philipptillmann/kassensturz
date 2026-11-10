@@ -18,7 +18,7 @@ private fun values(vararg pairs: Pair<String, Any?>) = ContentValues().apply { p
 } }
 private fun JSONObject.exactLong(key: String): Long {
     val raw=get(key).toString()
-    require(Regex("-?[0-9]+").matches(raw)) { "Ungültiger ganzzahliger Wert: $key" }
+    require(Regex("-?[0-9]+").matches(raw)) { ("" + L10n.t("Ungültiger ganzzahliger Wert: ") + (key)) }
     return raw.toLong()
 }
 private fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
@@ -46,7 +46,7 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         if (demo) seed(db)
     }
     override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) {
-        require(old >= 1 && new <= 6) { "Unbekannte Datenbankversion $old → $new" }
+        require(old >= 1 && new <= 6) { ("" + L10n.t("Unbekannte Datenbankversion ") + (old) + L10n.t(" → ") + (new)) }
         if(old < 5) createWealth(db)
         if(old < 6 && !db.rawQuery("PRAGMA table_info(entries)",null).use { c -> var found=false;while(c.moveToNext()) { if(c.getString(1)=="expected_contribution")found=true };found }) db.execSQL("ALTER TABLE entries ADD COLUMN expected_contribution INTEGER")
         if(old < 4) createPaymentTypes(db)
@@ -67,27 +67,27 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
             val linked=e.getJSONArray("entries");val signs=mutableListOf<Boolean>()
             repeat(linked.length()) { i ->
                 db.rawQuery("SELECT amount,kind,group_name,parts FROM entries WHERE id=?",arrayOf(linked.getLong(i).toString())).use { c ->
-                    require(c.moveToFirst() && c.getString(1)=="expense" && c.getString(2).isEmpty() && JSONArray(c.getString(3)).length()==0 && kotlin.math.abs(c.getLong(0))==e.num("amount")) { "Nur passende, ungeteilte Bankbuchungen ohne Gruppe zuordnen." }
+                    require(c.moveToFirst() && c.getString(1)=="expense" && c.getString(2).isEmpty() && JSONArray(c.getString(3)).length()==0 && kotlin.math.abs(c.getLong(0))==e.num("amount")) { L10n.t("Nur passende, ungeteilte Bankbuchungen ohne Gruppe zuordnen.") }
                     signs.add(c.getLong(0)>0)
                 }
             }
-            require(signs.size<2 || signs[0]!=signs[1]) { "Zwei Bankbuchungen müssen entgegengesetzte Vorzeichen haben." }
+            require(signs.size<2 || signs[0]!=signs[1]) { L10n.t("Zwei Bankbuchungen müssen entgegengesetzte Vorzeichen haben.") }
         }
     }
     fun refreshWealthQuote(id:Long, name:String, key:String) {
-        val original=wealth();val a=Wealth.asset(original,id) ?: error("Depot fehlt.")
+        val original=wealth();val a=Wealth.asset(original,id) ?: error(L10n.t("Depot fehlt."))
         val p=a.getJSONArray("positions").rows().first { it.getString("name")==name }
         val quote=WealthQuotes.fetch(p.getString("symbol"),key)
         transaction { db ->
-            val latest=wealth(db);val current=Wealth.asset(latest,id)?.getJSONArray("positions")?.rows()?.find { it.getString("name")==name } ?: error("Position fehlt.")
-            require(current.toString()==p.toString()) { "Position inzwischen geändert." }
-            require(quote.second>=current.getString("date")) { "Anbieter liefert älteren Kurs; gespeicherter Kurs bleibt erhalten." }
+            val latest=wealth(db);val current=Wealth.asset(latest,id)?.getJSONArray("positions")?.rows()?.find { it.getString("name")==name } ?: error(L10n.t("Position fehlt."))
+            require(current.toString()==p.toString()) { L10n.t("Position inzwischen geändert.") }
+            require(quote.second>=current.getString("date")) { L10n.t("Anbieter liefert älteren Kurs; gespeicherter Kurs bleibt erhalten.") }
             current.put("price",quote.first).put("date",quote.second);putWealth(db,latest)
         }
     }
     fun configurePayment(name:String,kind:String,account:Account?=null) = transaction { db ->
-        val cleaned=name.trim();require(cleaned.isNotEmpty() && cleaned.length<=60 && kind in listOf("cash","bank","other")) { "Ungültiges Zahlungsmittel." }
-        if(kind=="bank") { require(account!=null && account.name==cleaned) { "Kontoeinstellungen fehlen." };configure(account) }
+        val cleaned=name.trim();require(cleaned.isNotEmpty() && cleaned.length<=60 && kind in listOf("cash","bank","other")) { L10n.t("Ungültiges Zahlungsmittel.") }
+        if(kind=="bank") { require(account!=null && account.name==cleaned) { L10n.t("Kontoeinstellungen fehlen.") };configure(account) }
         else {
             db.insertWithOnConflict("payments",null,values("name" to cleaned),SQLiteDatabase.CONFLICT_IGNORE)
             for(table in listOf("transfers","ignored")) db.delete(table,"outgoing IN (SELECT id FROM entries WHERE payment=?) OR incoming IN (SELECT id FROM entries WHERE payment=?)",arrayOf(cleaned,cleaned))
@@ -106,9 +106,9 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
     }
     fun revertCsvImport(token:String): Int = transaction { db ->
         val linked=Wealth.linked(wealth(db))
-        require(db.rawQuery("SELECT entry_id FROM csv_undo_entries",null).use { c -> var safe=true;while(c.moveToNext())if(c.getLong(0) in linked)safe=false;safe }) { "Zuerst Bankzuordnungen dieses Imports im Vermögensjournal aufheben." }
+        require(db.rawQuery("SELECT entry_id FROM csv_undo_entries",null).use { c -> var safe=true;while(c.moveToNext())if(c.getLong(0) in linked)safe=false;safe }) { L10n.t("Zuerst Bankzuordnungen dieses Imports im Vermögensjournal aufheben.") }
         val current=lastCsvImport()
-        require(current!=null && current.token==token) { "CSV-Import hat sich geändert oder wurde bereits rückgängig gemacht. Bitte erneut prüfen." }
+        require(current!=null && current.token==token) { L10n.t("CSV-Import hat sich geändert oder wurde bereits rückgängig gemacht. Bitte erneut prüfen.") }
         val removed=db.delete("entries","id IN (SELECT entry_id FROM csv_undo_entries)",null)
         db.delete("csv_undo_entries",null,null);db.delete("csv_undo",null,null)
         reconcile()
@@ -118,26 +118,26 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
     private fun parseParts(raw: String) = JSONArray(raw).objects().map { Part(it.getString("name"),it.exactLong("amount"),it.getString("category"),if (it.isNull("group")) null else it.getString("group")) }
     private fun putEntry(db: SQLiteDatabase, e: Entry): Long {
         Ledger.validate(e)
-        require(db.rawQuery("SELECT 1 FROM categories WHERE name=?",arrayOf(e.category)).use { it.moveToFirst() }) { "Kategorie existiert nicht." }
-        e.parts.forEach { p -> require(db.rawQuery("SELECT 1 FROM categories WHERE name=?",arrayOf(p.category)).use { it.moveToFirst() }) { "Positionskategorie existiert nicht." } }
+        require(db.rawQuery("SELECT 1 FROM categories WHERE name=?",arrayOf(e.category)).use { it.moveToFirst() }) { L10n.t("Kategorie existiert nicht.") }
+        e.parts.forEach { p -> require(db.rawQuery("SELECT 1 FROM categories WHERE name=?",arrayOf(p.category)).use { it.moveToFirst() }) { L10n.t("Positionskategorie existiert nicht.") } }
         if (e.payment.isNotEmpty()) db.insertWithOnConflict("payments",null,values("name" to e.payment),SQLiteDatabase.CONFLICT_IGNORE)
         val v = values("date" to e.date,"merchant" to e.merchant.trim(),"amount" to e.amount,"category" to e.category,"payment" to e.payment,"kind" to e.kind,"notes" to e.notes,"group_name" to e.group.trim(),"parts" to partsJson(e.parts),"counterparty" to e.counterparty,"import_key" to e.importKey,"expected_contribution" to e.expectedContribution)
-        return if (e.id == 0L) db.insertOrThrow("entries",null,v) else { require(db.update("entries",v,"id=?",arrayOf(e.id.toString())) == 1) { "Buchung nicht gefunden." }; e.id }
+        return if (e.id == 0L) db.insertOrThrow("entries",null,v) else { require(db.update("entries",v,"id=?",arrayOf(e.id.toString())) == 1) { L10n.t("Buchung nicht gefunden.") }; e.id }
     }
     fun save(e: Entry, receipt: ByteArray? = null, removeReceipt: Boolean = false): Long = transaction { db ->
-        require(e.id !in Wealth.linked(wealth(db))) { "Zuerst Bankzuordnung im Vermögensjournal aufheben." }
+        require(e.id !in Wealth.linked(wealth(db))) { L10n.t("Zuerst Bankzuordnung im Vermögensjournal aufheben.") }
         val id = putEntry(db,e)
         // Editing either leg invalidates an earlier manual transfer pairing.
         db.delete("transfers","outgoing=? OR incoming=?",arrayOf(id.toString(),id.toString()))
         if (removeReceipt) db.delete("receipts","entry_id=?",arrayOf(id.toString()))
         if (receipt != null) {
-            require(receipt.size <= 4_000_000 && receipt.size > 2 && receipt[0] == 0xff.toByte() && receipt[1] == 0xd8.toByte()) { "Ungültiges JPEG." }
+            require(receipt.size <= 4_000_000 && receipt.size > 2 && receipt[0] == 0xff.toByte() && receipt[1] == 0xd8.toByte()) { L10n.t("Ungültiges JPEG.") }
             db.insertWithOnConflict("receipts",null,values("entry_id" to id,"image" to receipt),SQLiteDatabase.CONFLICT_REPLACE)
         }
         reconcile()
         id
     }
-    fun delete(id: Long) { require(id !in Wealth.linked(wealth())) { "Zuerst Bankzuordnung im Vermögensjournal aufheben." };writableDatabase.delete("entries","id=?",arrayOf(id.toString())) }
+    fun delete(id: Long) { require(id !in Wealth.linked(wealth())) { L10n.t("Zuerst Bankzuordnung im Vermögensjournal aufheben.") };writableDatabase.delete("entries","id=?",arrayOf(id.toString())) }
     fun receipt(id: Long): ByteArray? = readableDatabase.rawQuery("SELECT image FROM receipts WHERE entry_id=?",arrayOf(id.toString())).use { if (it.moveToFirst()) it.getBlob(0) else null }
     fun snapshot(): Snapshot {
         val db = readableDatabase
@@ -156,21 +156,21 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
         return Snapshot(entries.map { it.copy(wealthTransfer=it.id in linked) },names("categories"),names("payments"),accounts,transfers,ignored,types,wealth)
     }
     fun addName(name: String, category: Boolean) {
-        val cleaned = name.trim(); require(cleaned.isNotEmpty() && cleaned.length <= 60) { "Name: 1–60 Zeichen." }
+        val cleaned = name.trim(); require(cleaned.isNotEmpty() && cleaned.length <= 60) { L10n.t("Name: 1–60 Zeichen.") }
         writableDatabase.insertOrThrow(if(category) "categories" else "payments",null,values("name" to cleaned))
     }
     fun renameCategory(old: String, name: String) = transaction { db ->
-        val cleaned = name.trim(); require(cleaned.isNotEmpty() && cleaned.length <= 60) { "Name: 1–60 Zeichen." }
-        require(db.update("categories",values("name" to cleaned),"name=?",arrayOf(old))==1) { "Kategorie fehlt." }
+        val cleaned = name.trim(); require(cleaned.isNotEmpty() && cleaned.length <= 60) { L10n.t("Name: 1–60 Zeichen.") }
+        require(db.update("categories",values("name" to cleaned),"name=?",arrayOf(old))==1) { L10n.t("Kategorie fehlt.") }
         db.rawQuery("SELECT id,parts FROM entries",null).use { c -> while(c.moveToNext()) {
             val parts = parseParts(c.getString(1)).map { if(it.category == old) it.copy(category=cleaned) else it }
             db.update("entries",values("parts" to partsJson(parts)),"id=?",arrayOf(c.getLong(0).toString()))
         } }
     }
     fun configure(account: Account, autoMatch: Boolean = true) = transaction { db ->
-        require(account.name.isNotBlank() && account.name.length <= 60 && account.share in 0..10000) { "Ungültige Kontoeinstellungen." }
+        require(account.name.isNotBlank() && account.name.length <= 60 && account.share in 0..10000) { L10n.t("Ungültige Kontoeinstellungen.") }
         val iban = normalizeIban(account.iban)
-        require(iban.isEmpty() || !db.rawQuery("SELECT 1 FROM accounts WHERE iban=? AND name!=?",arrayOf(iban,account.name)).use { it.moveToFirst() }) { "IBAN bereits vergeben." }
+        require(iban.isEmpty() || !db.rawQuery("SELECT 1 FROM accounts WHERE iban=? AND name!=?",arrayOf(iban,account.name)).use { it.moveToFirst() }) { L10n.t("IBAN bereits vergeben.") }
         db.insertWithOnConflict("payments",null,values("name" to account.name),SQLiteDatabase.CONFLICT_IGNORE)
         db.delete("payment_types","name=?",arrayOf(account.name))
         // UPDATE instead of REPLACE: preserve foreign-key identity.
@@ -180,10 +180,10 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
     }
     fun link(pair: Transfer) = transaction { db ->
         val entries = snapshot().entries.associateBy { it.id }
-        val a = entries[pair.outgoing] ?: error("Buchung fehlt."); val b = entries[pair.incoming] ?: error("Buchung fehlt.")
-        require(a.amount > 0 && b.amount == -a.amount && a.payment.isNotEmpty() && b.payment.isNotEmpty() && a.payment != b.payment && a.group.isEmpty() && b.group.isEmpty() && (a.parts+b.parts).none { !it.group.isNullOrEmpty() }) { "Keine passenden Gegenbuchungen. Gruppen zuerst entfernen." }
-        require(snapshot().accounts.map { it.name }.containsAll(listOf(a.payment,b.payment))) { "Beide Zahlungsmittel als eigene Konten konfigurieren." }
-        require(!db.rawQuery("SELECT 1 FROM transfers WHERE outgoing IN (?,?) OR incoming IN (?,?)",arrayOf(a.id.toString(),b.id.toString(),a.id.toString(),b.id.toString())).use { it.moveToFirst() }) { "Buchung bereits zugeordnet." }
+        val a = entries[pair.outgoing] ?: error(L10n.t("Buchung fehlt.")); val b = entries[pair.incoming] ?: error(L10n.t("Buchung fehlt."))
+        require(a.amount > 0 && b.amount == -a.amount && a.payment.isNotEmpty() && b.payment.isNotEmpty() && a.payment != b.payment && a.group.isEmpty() && b.group.isEmpty() && (a.parts+b.parts).none { !it.group.isNullOrEmpty() }) { L10n.t("Keine passenden Gegenbuchungen. Gruppen zuerst entfernen.") }
+        require(snapshot().accounts.map { it.name }.containsAll(listOf(a.payment,b.payment))) { L10n.t("Beide Zahlungsmittel als eigene Konten konfigurieren.") }
+        require(!db.rawQuery("SELECT 1 FROM transfers WHERE outgoing IN (?,?) OR incoming IN (?,?)",arrayOf(a.id.toString(),b.id.toString(),a.id.toString(),b.id.toString())).use { it.moveToFirst() }) { L10n.t("Buchung bereits zugeordnet.") }
         db.insertOrThrow("transfers",null,values("outgoing" to a.id,"incoming" to b.id))
     }
     fun unlink(pair: Transfer) = transaction { db ->
@@ -245,8 +245,8 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
     private fun entryJson(e: Entry) = JSONObject().put("id",e.id).put("date",e.date).put("merchant",e.merchant).put("amount",e.amount).put("category",e.category).put("payment",e.payment).put("kind",e.kind).put("notes",e.notes).put("group",e.group).put("parts",JSONArray(partsJson(e.parts))).put("receipt",e.receipt).put("counterparty",e.counterparty).put("import_key",e.importKey ?: JSONObject.NULL).put("expected_contribution",e.expectedContribution ?: JSONObject.NULL)
     fun backup(output: OutputStream) = transaction { _ ->
         val s=snapshot()
-        require(s.entries.size <= 50000 && s.categories.size <= 2000 && s.payments.size <= 2000) { "Datensatz für dieses Sicherungsformat zu groß." }
-        readableDatabase.rawQuery("SELECT COALESCE(SUM(length(image)),0) FROM receipts",null).use { c -> c.moveToFirst();require(c.getLong(0)<=512_000_000) { "Belege für dieses Sicherungsformat zu groß (max. 512 MB)." } }
+        require(s.entries.size <= 50000 && s.categories.size <= 2000 && s.payments.size <= 2000) { L10n.t("Datensatz für dieses Sicherungsformat zu groß.") }
+        readableDatabase.rawQuery("SELECT COALESCE(SUM(length(image)),0) FROM receipts",null).use { c -> c.moveToFirst();require(c.getLong(0)<=512_000_000) { L10n.t("Belege für dieses Sicherungsformat zu groß (max. 512 MB).") } }
         val metadata=JSONObject().put("format","kassensturz-android").put("version",1).put("category_defaults_version",1).put("dataset",if(demo)"demo" else "private").put("created_at",java.time.Instant.now().toString())
             .put("wealth",s.wealth).put("version",if(s.entries.any { it.expectedContribution!=null })3 else if(Wealth.assets(s.wealth).isEmpty())1 else 2)
             .put("payment_types",JSONObject(s.paymentTypes))
@@ -256,32 +256,32 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
             .put("ignored",JSONArray().apply { s.ignored.forEach { put(JSONObject().put("outgoing",it.outgoing).put("incoming",it.incoming)) } })
             .put("transfers",JSONArray().apply { s.transfers.forEach { put(JSONObject().put("outgoing",it.outgoing).put("incoming",it.incoming)) } })
         val raw=metadata.toString().toByteArray(Charsets.UTF_8)
-        require(raw.size <= 16_000_000) { "Datensatz für dieses Sicherungsformat zu groß." }
+        require(raw.size <= 16_000_000) { L10n.t("Datensatz für dieses Sicherungsformat zu groß.") }
         ZipOutputStream(output).use { zip ->
             zip.putNextEntry(ZipEntry("data.json")); zip.write(raw); zip.closeEntry()
-            s.entries.filter { it.receipt }.forEach { e -> zip.putNextEntry(ZipEntry("receipts/${e.id}.jpg")); zip.write(receipt(e.id) ?: error("Beleg fehlt.")); zip.closeEntry() }
+            s.entries.filter { it.receipt }.forEach { e -> zip.putNextEntry(ZipEntry(("" + L10n.t("receipts/") + (e.id) + L10n.t(".jpg")))); zip.write(receipt(e.id) ?: error(L10n.t("Beleg fehlt."))); zip.closeEntry() }
         }
     }
     fun restore(input: InputStream) = transaction { db ->
         ZipInputStream(input).use { zip ->
-            require(zip.nextEntry?.name == "data.json") { "Keine Kassensturz-Android-Sicherung." }
+            require(zip.nextEntry?.name == "data.json") { L10n.t("Keine Kassensturz-Android-Sicherung.") }
             val meta=JSONObject(readLimited(zip,16_000_000).toString(Charsets.UTF_8))
-            require(meta.getString("format")=="kassensturz-android" && meta.getInt("version") in 1..3) { "Unbekanntes Sicherungsformat." }
+            require(meta.getString("format")=="kassensturz-android" && meta.getInt("version") in 1..3) { L10n.t("Unbekanntes Sicherungsformat.") }
             val wealth=Wealth.validate(meta.optJSONObject("wealth") ?: Wealth.empty())
             val cats=meta.getJSONArray("categories").strings().toMutableList()
-            require(cats.isNotEmpty()) { "Ungültige Kategorien in der Sicherung." }
+            require(cats.isNotEmpty()) { L10n.t("Ungültige Kategorien in der Sicherung.") }
             // Migrate legacy backups once; modern backups retain renamed defaults.
             if(meta.optInt("category_defaults_version",0)<1 && "Ausgehen" !in cats) cats.add("Ausgehen")
             val payments=meta.getJSONArray("payments").strings()
-            require(cats.isNotEmpty() && cats.size <= 2000 && payments.size <= 2000 && (cats+payments).all { it.isNotBlank() && it.length <= 60 }) { "Ungültige Kategorien oder Zahlungsmittel." }
+            require(cats.isNotEmpty() && cats.size <= 2000 && payments.size <= 2000 && (cats+payments).all { it.isNotBlank() && it.length <= 60 }) { L10n.t("Ungültige Kategorien oder Zahlungsmittel.") }
             val rows=meta.getJSONArray("entries").objects()
-            require(rows.size <= 50000) { "Zu viele Buchungen." }
+            require(rows.size <= 50000) { L10n.t("Zu viele Buchungen.") }
             val expectedReceipts=mutableSetOf<Long>()
             listOf("csv_undo_entries","csv_undo","ignored","transfers","receipts","entries","accounts","payment_types","payments","categories").forEach { db.delete(it,null,null) }
             cats.forEach { db.insertOrThrow("categories",null,values("name" to it)) }; payments.forEach { db.insertOrThrow("payments",null,values("name" to it)) }
             rows.forEach { j ->
                 val e=Entry(id=j.exactLong("id"),date=j.getString("date"),merchant=j.getString("merchant"),amount=j.exactLong("amount"),category=j.getString("category"),payment=j.getString("payment"),kind=j.getString("kind"),notes=j.getString("notes"),group=j.getString("group"),parts=parseParts(j.getJSONArray("parts").toString()),counterparty=j.getString("counterparty"),importKey=if(j.isNull("import_key")) null else j.getString("import_key"),expectedContribution=if(!j.has("expected_contribution") || j.isNull("expected_contribution")) null else j.exactLong("expected_contribution"))
-                require(e.id > 0) { "Ungültige ID." }; Ledger.validate(e)
+                require(e.id > 0) { L10n.t("Ungültige ID.") }; Ledger.validate(e)
                 // Insert placeholder identity, then use the normal validated write path.
                 db.execSQL("INSERT INTO entries(id,date,merchant,amount,category,payment,kind,notes,group_name,parts,counterparty) VALUES (?,?,?,1,?,'','expense','','','[]','')",arrayOf(e.id,e.date,e.merchant,e.category))
                 putEntry(db,e)
@@ -289,9 +289,9 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
             }
             meta.getJSONArray("accounts").objects().forEach { j -> configure(Account(j.getString("name"),j.getInt("share"),j.getBoolean("share_income"),j.getString("iban")),autoMatch=false) }
             meta.optJSONObject("payment_types")?.let { types ->
-                require(types.length()<=2000) { "Zu viele Zahlungsmitteltypen." }
+                require(types.length()<=2000) { L10n.t("Zu viele Zahlungsmitteltypen.") }
                 val bankNames=snapshot().accounts.map { it.name }.toSet()
-                types.keys().forEach { name -> val kind=types.getString(name);require(name in payments && name !in bankNames && kind in listOf("cash","other")) { "Ungültiger Zahlungsmitteltyp." };db.insertOrThrow("payment_types",null,values("name" to name,"kind" to kind)) }
+                types.keys().forEach { name -> val kind=types.getString(name);require(name in payments && name !in bankNames && kind in listOf("cash","other")) { L10n.t("Ungültiger Zahlungsmitteltyp.") };db.insertOrThrow("payment_types",null,values("name" to name,"kind" to kind)) }
             }
             meta.getJSONArray("transfers").objects().forEach { j -> link(Transfer(j.exactLong("outgoing"),j.exactLong("incoming"))) }
             meta.optJSONArray("ignored")?.objects()?.forEach { j ->
@@ -300,41 +300,41 @@ class Store(context: Context, val demo: Boolean) : SQLiteOpenHelper(context, if 
             var total=0L
             while(true) {
                 val part=zip.nextEntry ?: break
-                require(Regex("receipts/[1-9][0-9]*\\.jpg").matches(part.name)) { "Unbekannter Archivinhalt." }
+                require(Regex("receipts/[1-9][0-9]*\\.jpg").matches(part.name)) { L10n.t("Unbekannter Archivinhalt.") }
                 val id=part.name.removePrefix("receipts/").removeSuffix(".jpg").toLong()
-                require(expectedReceipts.remove(id)) { "Doppelter oder unbekannter Beleg." }
+                require(expectedReceipts.remove(id)) { L10n.t("Doppelter oder unbekannter Beleg.") }
                 val bytes=readLimited(zip,4_000_000); total += bytes.size
-                require(total <= 512_000_000 && bytes.size > 2 && bytes[0] == 0xff.toByte() && bytes[1] == 0xd8.toByte()) { "Belegarchiv ist ungültig oder zu groß." }
+                require(total <= 512_000_000 && bytes.size > 2 && bytes[0] == 0xff.toByte() && bytes[1] == 0xd8.toByte()) { L10n.t("Belegarchiv ist ungültig oder zu groß.") }
                 db.insertOrThrow("receipts",null,values("entry_id" to id,"image" to bytes))
             }
-            require(expectedReceipts.isEmpty()) { "Belege fehlen in der Sicherung." }
+            require(expectedReceipts.isEmpty()) { L10n.t("Belege fehlen in der Sicherung.") }
             val ids=snapshot().entries.map { it.id }.toSet()
-            require(Wealth.linked(wealth).all { it in ids }) { "Vermögensumbuchung verweist auf fehlende Bankbuchung." }
+            require(Wealth.linked(wealth).all { it in ids }) { L10n.t("Vermögensumbuchung verweist auf fehlende Bankbuchung.") }
             validateWealthLinks(db,wealth)
             putWealth(db,wealth)
         }
     }
     companion object {
         fun inspectBackup(input: InputStream): BackupSummary = ZipInputStream(input).use { zip ->
-            require(zip.nextEntry?.name == "data.json") { "Keine Kassensturz-Sicherung." }
+            require(zip.nextEntry?.name == "data.json") { L10n.t("Keine Kassensturz-Sicherung.") }
             val meta=JSONObject(readLimited(zip,16_000_000).toString(Charsets.UTF_8))
-            require(meta.getString("format")=="kassensturz-android" && meta.getInt("version") in 1..3) { "Unbekanntes Sicherungsformat." }
+            require(meta.getString("format")=="kassensturz-android" && meta.getInt("version") in 1..3) { L10n.t("Unbekanntes Sicherungsformat.") }
             Wealth.validate(meta.optJSONObject("wealth") ?: Wealth.empty())
             val entries=meta.getJSONArray("entries").objects()
-            require(entries.size<=50000) { "Zu viele Buchungen." }
+            require(entries.size<=50000) { L10n.t("Zu viele Buchungen.") }
             BackupSummary(entries.size,entries.count { it.getBoolean("receipt") },meta.optString("dataset","unknown").take(20),meta.optString("created_at","").take(100))
         }
         fun readLimited(input: InputStream, max: Int): ByteArray {
             val out=java.io.ByteArrayOutputStream(); val buffer=ByteArray(8192)
-            while(true) { val n=input.read(buffer); if(n<0) break; require(out.size()+n <= max) { "Datei ist zu groß." }; out.write(buffer,0,n) }
+            while(true) { val n=input.read(buffer); if(n<0) break; require(out.size()+n <= max) { L10n.t("Datei ist zu groß.") }; out.write(buffer,0,n) }
             return out.toByteArray()
         }
         fun normalizeIban(raw: String): String {
             val iban=raw.replace(Regex("\\s"),"").uppercase(java.util.Locale.ROOT)
             if(iban.isEmpty()) return ""
-            require(Regex("[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}").matches(iban)) { "Ungültige IBAN." }
+            require(Regex("[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}").matches(iban)) { L10n.t("Ungültige IBAN.") }
             val number=(iban.drop(4)+iban.take(4)).map { if(it.isLetter()) (it.code-55).toString() else it.toString() }.joinToString("")
-            require(java.math.BigInteger(number).mod(java.math.BigInteger.valueOf(97)).toInt()==1) { "IBAN-Prüfsumme stimmt nicht." }
+            require(java.math.BigInteger(number).mod(java.math.BigInteger.valueOf(97)).toInt()==1) { L10n.t("IBAN-Prüfsumme stimmt nicht.") }
             return iban
         }
     }

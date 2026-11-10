@@ -11,7 +11,7 @@ import java.time.LocalDate
 /** A single optional, user-triggered free GLOBAL_QUOTE request. No retries. */
 object WealthQuotes {
     fun fetch(symbol:String,key:String):Pair<Long,String> {
-        require(Regex("[A-Za-z0-9.^_-]{1,30}").matches(symbol) && Regex("[A-Za-z0-9]{1,100}").matches(key)) { "Börsensymbol oder API-Schlüssel ungültig." }
+        require(Regex("[A-Za-z0-9.^_-]{1,30}").matches(symbol) && Regex("[A-Za-z0-9]{1,100}").matches(key)) { L10n.t("Börsensymbol oder API-Schlüssel ungültig.") }
         val connection=URL("https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${URLEncoder.encode(symbol,"UTF-8")}&apikey=${URLEncoder.encode(key,"UTF-8")}").openConnection() as HttpURLConnection
         try {
             connection.connectTimeout=10000;connection.readTimeout=10000;connection.instanceFollowRedirects=false
@@ -21,7 +21,7 @@ object WealthQuotes {
             val price=BigDecimal(quote.getString("05. price"));require(price>BigDecimal.ZERO && price<=BigDecimal(1000000))
             val date=LocalDate.parse(quote.getString("07. latest trading day"));require(date<=LocalDate.now())
             return price.movePointRight(6).setScale(0,RoundingMode.HALF_UP).longValueExact() to date.toString()
-        } catch(e:Exception) { throw IllegalArgumentException("Kein Kurs verfügbar. Symbol, kostenloses API-Limit und Verbindung prüfen. Bisheriger Kurs bleibt erhalten.") }
+        } catch(e:Exception) { throw IllegalArgumentException(L10n.t("Kein Kurs verfügbar. Symbol, kostenloses API-Limit und Verbindung prüfen. Bisheriger Kurs bleibt erhalten.")) }
         finally { connection.disconnect() }
     }
 }
