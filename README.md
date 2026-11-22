@@ -613,3 +613,7 @@ Receipt selection accepts images and PDF invoices (1–5 pages, up to 12 MB).
 Every PDF page is rendered into a readable JPEG, saved with the entry and included
 in backups. Keep the original PDF separately if needed. Invalid, protected or
 oversized PDFs are rejected rather than truncated. See the bilingual user manuals.
+
+Server deployments using an existing host HTTPS proxy can use
+`update.sh --external-proxy` on the server branch; see
+[external proxy setup](docs/SECURITY.md#existing-https-reverse-proxy).

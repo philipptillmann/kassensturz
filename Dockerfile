@@ -18,6 +18,7 @@ RUN pip install --only-binary=:all: --no-cache-dir -r requirements.txt -r requir
 COPY localization.py storage.py app.py server.py receipts.py bank_providers.py datasets.py accounts.py users.py backups.py shortcut_api.py wealth.py ./
 COPY sample-data ./sample-data
 COPY static ./static
+COPY update.sh ./
 COPY tests ./tests
 COPY tools ./tools
 COPY docs ./docs

@@ -156,3 +156,40 @@ Server mit Zugriff auf seinen Schlüssel. Keine eigene Kryptografieimplementieru
 Referenzen: [SQLCipher](https://www.zetetic.net/sqlcipher/),
 [sqlcipher3](https://github.com/coleifer/sqlcipher3),
 [Caddy HTTPS](https://caddyserver.com/docs/automatic-https).
+
+## Existing HTTPS reverse proxy
+
+When Caddy/nginx already runs on the host, keep its HTTPS configuration and
+publish the app only on loopback. Store the port mapping in the ignored file
+`compose.server-local.yaml`, for example:
+
+```yaml
+services:
+  app:
+    ports:
+      - "127.0.0.1:18101:8080"
+```
+
+Keep `DOMAIN` and `HTTPS_PORT` in `.env` set to the hostname and public HTTPS
+port used by that proxy. The app still requires HTTPS and trusts the forwarded
+protocol header; the loopback binding prevents direct network access to the app.
+The proxy should forward to that loopback port and set `X-Forwarded-Proto: https`.
+Do not put passwords or private hostnames in tracked files.
+
+After initially pulling the updated script, run:
+
+```bash
+./update.sh --external-proxy
+```
+
+This records the choice in the ignored `.external-proxy-deployment` marker.
+Subsequent `./update.sh` calls automatically load `compose.server-local.yaml`
+and build/start only `app`, with `--no-deps`. They do not start, stop or modify
+Caddy. For encrypted storage, continue passing `--encrypted` as well. The local
+override is applied after the encryption Compose file. Configuration is validated
+before any build or container replacement. A missing override aborts the update.
+
+To deliberately return to the bundled Caddy setup, remove the marker and review
+port conflicts and the local override before updating. Default installations
+without this marker/flag retain the full-stack update behavior. Neither mode
+supports editing tracked Compose files; keep custom settings in the local override.
