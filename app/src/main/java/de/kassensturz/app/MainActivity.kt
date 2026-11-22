@@ -460,7 +460,7 @@ class MainActivity : Activity() {
         init {
             draft?.getString("parts")?.let { raw -> parts.clear();val a=org.json.JSONArray(raw);for(i in 0 until a.length()) { val p=a.getJSONObject(i);parts.add(Part(p.getString("name"),p.getLong("amount"),p.getString("category"),if(p.isNull("group"))null else p.getString("group"))) } }
             button(base,L10n.t("+ Position aufteilen")) { partDialog(null) }
-            button(base,L10n.t("Belegfoto auswählen (auch HEIC)")) { openDocument(110,"image/*") }
+            button(base,L10n.t("Beleg auswählen (Bild oder PDF)")) { openDocument(110,"*/*") }
             button(base,L10n.t("Beleg fotografieren")) { capture() }
             button(base,L10n.t("Beleg anzeigen")) { showReceipt() }
             button(base,L10n.t("Text aus Beleg lesen")) { ocr() }
@@ -500,7 +500,17 @@ class MainActivity : Activity() {
             putString("parts",org.json.JSONArray().apply { parts.forEach { p->put(org.json.JSONObject().put("name",p.name).put("amount",p.amount).put("category",p.category).put("group",p.group ?: org.json.JSONObject.NULL)) } }.toString())
         }
         fun showReceipt() { work({photo?.takeIf { it.exists() }?.readBytes() ?: if(!removeReceipt) original?.let { store.receipt(it.id) } else null}) { bytes ->
-            if(bytes==null)toast(L10n.t("Kein Beleg vorhanden.")) else { val image=ImageView(this@MainActivity);image.adjustViewBounds=true;image.setImageBitmap(android.graphics.BitmapFactory.decodeByteArray(bytes,0,bytes.size));val scroll=ScrollView(this@MainActivity);scroll.addView(image);AlertDialog.Builder(this@MainActivity).setTitle(L10n.t("Beleg")).setView(scroll).setPositiveButton(L10n.t("Schließen"),null).show() }
+            if(bytes==null)toast(L10n.t("Kein Beleg vorhanden.")) else { val decoded=android.graphics.BitmapFactory.decodeByteArray(bytes,0,bytes.size)
+                val tiles=LinearLayout(this@MainActivity).apply { orientation=LinearLayout.VERTICAL }
+                // Tall multi-page receipts exceed some GPUs' bitmap texture limit.
+                // Display contiguous small tiles; retain the full JPEG in storage.
+                var top=0
+                while(top<decoded.height) {
+                    val tile=android.graphics.Bitmap.createBitmap(decoded,0,top,decoded.width,minOf(2048,decoded.height-top))
+                    tiles.addView(ImageView(this@MainActivity).apply { adjustViewBounds=true;setImageBitmap(tile) })
+                    top+=2048
+                }
+                val scroll=ScrollView(this@MainActivity);scroll.addView(tiles);AlertDialog.Builder(this@MainActivity).setTitle(L10n.t("Beleg")).setView(scroll).setPositiveButton(L10n.t("Schließen"),null).show() }
         } }
         fun ocr() { work({photo?.readBytes() ?: if(!removeReceipt) original?.let { store.receipt(it.id) } else null}) { bytes ->
             if(bytes==null) { toast(L10n.t("Zuerst ein Belegfoto auswählen."));return@work }
@@ -532,7 +542,7 @@ class MainActivity : Activity() {
         window.show();window.window?.setLayout(-1,-1)
     }
     private fun createDocument(code:Int,mime:String,name:String) { startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE);type=mime;putExtra(Intent.EXTRA_TITLE,name) },code) }
-    private fun openDocument(code:Int,mime:String) { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE);type=mime },code) }
+    private fun openDocument(code:Int,mime:String) { startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE);type=mime;if(code==110) putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("image/*","application/pdf")) },code) }
     private fun capture() {
         try {
             val folder=File(cacheDir,"camera").apply { mkdirs() }

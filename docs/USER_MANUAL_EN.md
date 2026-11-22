@@ -1,6 +1,6 @@
 # Kassensturz user manual
 
-Version 1.2.0 · English
+Version 1.3.0 · English
 
 ## Getting started
 
@@ -39,6 +39,8 @@ Internal transfers between your own bank accounts have two corresponding entries
 Scan or upload an image and review the extracted merchant, date, total and items before saving. OCR can make mistakes. The saved receipt image is converted to a compressed JPEG intended to remain readable; it is not a byte-for-byte copy of the original upload. Server supports HEIC conversion. Android HEIC support depends on the device's image decoder. Keep the original separately if you need original-file fidelity.
 
 A saved receipt remains attached to the entry and is included in a full ZIP backup. Verify the picture after saving. Deleting an entry or replacing its picture removes the associated stored image as appropriate. CSV exports do not contain receipt pictures.
+
+PDF invoices are also accepted in the receipt picker. All pages (1–5 pages, maximum 12 MB) are rendered in order into one readable JPEG, with page separators; the original PDF bytes are not retained. PDF pages are rendered at 1600 pixels wide. Excessively tall or large pages and unreadable/password-protected files are rejected; pages are never silently omitted. The saved JPEG is limited to 4 MB and is included in standard backups. Keep the source PDF separately if required. Server OCR reads the rendered pages separately; always review extracted values. Android opens the saved receipt image and uses its on-device OCR.
 
 ## Bank CSV import and undo
 

@@ -43,4 +43,34 @@ class ReceiptTest {
             assertTrue(text,text.contains("SUMME"));assertTrue(text,text.contains("7,25") || text.contains("7.25"))
         } finally { recognizer.close();bitmap.recycle() }
     }
+    @Test fun pdfPreservesAllPagesAndRejectsOverLimit() {
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        val file=File.createTempFile("test-receipt-",".pdf",context.cacheDir)
+        fun writePdf(count:Int) {
+            android.graphics.pdf.PdfDocument().use { document ->
+                repeat(count) { index ->
+                    val page=document.startPage(android.graphics.pdf.PdfDocument.PageInfo.Builder(600,800,index+1).create())
+                    page.canvas.drawColor(if(index%2==0) Color.RED else Color.BLUE)
+                    document.finishPage(page)
+                }
+                file.outputStream().use { document.writeTo(it) }
+            }
+        }
+        try {
+            writePdf(2)
+            val bytes=ReceiptImages.jpeg(context,Uri.fromFile(file))
+            assertTrue(bytes.size<=4_000_000)
+            val image=BitmapFactory.decodeByteArray(bytes,0,bytes.size)
+            try {
+                assertEquals(1600,image.width);assertTrue(image.height>4000)
+                assertTrue(Color.red(image.getPixel(800,100))>200)
+                assertTrue(Color.blue(image.getPixel(800,image.height-100))>200)
+            } finally { image.recycle() }
+            writePdf(6)
+            try { ReceiptImages.jpeg(context,Uri.fromFile(file));fail("Six-page PDF must be rejected") } catch(expected:IllegalArgumentException) { }
+            file.writeText("%PDF-invalid")
+            try { ReceiptImages.jpeg(context,Uri.fromFile(file));fail("Invalid PDF must be rejected") } catch(expected:IllegalArgumentException) { }
+        } finally { file.delete() }
+    }
+
 }
