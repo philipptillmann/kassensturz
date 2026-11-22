@@ -858,5 +858,17 @@
   "request_id muss eine UUID sein.": "request_id must be a UUID.",
   "Hier den bankabhängigen Adapter implementieren.": "Implement the bank-specific adapter here.",
   "Betrag in Euro (positiv)": "Amount in EUR (positive)",
-  "Betrag (Vorzeichen wie Buchung)": "Amount (same sign as entry)"
+  "Betrag (Vorzeichen wie Buchung)": "Amount (same sign as entry)",
+  "PDF muss 1 bis 5 Seiten enthalten.": "PDF must contain 1 to 5 pages.",
+  "Ungültige PDF-Seitengröße.": "Invalid PDF page size.",
+  "PDF-Seitenformat ist zu lang oder ungültig.": "PDF page format is too long or invalid.",
+  "PDF ist zu groß. Bitte weniger Seiten auswählen.": "PDF is too large. Please select fewer pages.",
+  "PDF nicht lesbar oder passwortgeschützt. Bitte eine ungeschützte PDF verwenden.": "PDF is unreadable or password-protected. Please use an unprotected PDF.",
+  "PDF ist nach Kompression zu groß. Bitte weniger Seiten auswählen.": "PDF is too large after compression. Please select fewer pages.",
+  "PDF ist zu groß (maximal 12 MB).": "PDF is too large (maximum 12 MB).",
+  "Beleg auswählen (Bild oder PDF)": "Choose receipt (image or PDF)",
+  "Beleg ausgewählt. Alle PDF-Seiten werden beim Speichern als JPEG abgelegt (maximal 5 Seiten).": "Receipt selected. All PDF pages will be saved as JPEG (maximum 5 pages).",
+  "Beleg ist zu groß. Maximal 12 MB.": "Receipt is too large. Maximum 12 MB.",
+  "Manuelle Erfassung ist weiterhin möglich. Ein gültiger ausgewählter Beleg kann trotzdem gespeichert werden.": "Manual entry is still possible. A valid selected receipt can still be saved.",
+  "PDF: maximal 5 Seiten und 12 MB.": "PDF: maximum 5 pages and 12 MB."
 }

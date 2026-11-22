@@ -606,3 +606,10 @@ silently drop it; format 1/2 backups remain readable. Nothing is inferred for ol
 [English user manual](docs/USER_MANUAL_EN.md) · [Deutsches Benutzerhandbuch](docs/USER_MANUAL_DE.md).
 Choose Deutsch or English in Settings / Sprache unter Einstellungen auswählen.
 The preference belongs to this browser/device; saved names and notes stay unchanged.
+
+## PDF receipts (1.3.0)
+
+Receipt selection accepts images and PDF invoices (1–5 pages, up to 12 MB).
+Every PDF page is rendered into a readable JPEG, saved with the entry and included
+in backups. Keep the original PDF separately if needed. Invalid, protected or
+oversized PDFs are rejected rather than truncated. See the bilingual user manuals.

@@ -1,6 +1,6 @@
 # Kassensturz Benutzerhandbuch
 
-Version 1.2.0 · Deutsch
+Version 1.3.0 · Deutsch
 
 ## Einstieg
 
@@ -39,6 +39,8 @@ Umbuchungen zwischen eigenen Bankkonten bestehen aus zwei Gegenbuchungen. Die Er
 Scanne oder lade ein Bild hoch und prüfe Händler, Datum, Summe und Positionen vor dem Speichern. Die Texterkennung kann Fehler machen. Das gespeicherte Belegbild wird in ein komprimiertes, weiterhin lesbares JPEG umgewandelt; es ist keine unveränderte Kopie der hochgeladenen Originaldatei. Der Server unterstützt HEIC-Konvertierung. Unter Android hängt HEIC-Unterstützung vom Bilddecoder des Geräts ab. Bewahre das Original separat auf, wenn du die unveränderte Datei benötigst.
 
 Ein gespeicherter Beleg bleibt mit der Buchung verbunden und ist in der vollständigen ZIP-Sicherung enthalten. Prüfe das Bild nach dem Speichern. Beim Löschen einer Buchung oder Ersetzen ihres Bildes wird das bisherige zugehörige Bild entsprechend entfernt. CSV-Exporte enthalten keine Belegbilder.
+
+PDF-Rechnungen können ebenfalls in der Belegauswahl gewählt werden. Alle Seiten (1–5 Seiten, maximal 12 MB) werden der Reihe nach mit Seitenabständen in ein lesbares JPEG umgewandelt; die Original-PDF-Datei wird nicht unverändert gespeichert. PDF-Seiten werden mit 1600 Pixeln Breite gerendert. Übermäßig lange oder große Seiten sowie unlesbare/passwortgeschützte Dateien werden abgelehnt; Seiten werden niemals stillschweigend weggelassen. Das gespeicherte JPEG ist auf 4 MB begrenzt und in normalen Sicherungen enthalten. Bewahre die Quell-PDF bei Bedarf separat auf. Der Server liest die gerenderten Seiten einzeln per OCR; prüfe erkannte Werte immer. Android öffnet das gespeicherte Belegbild und verwendet seine lokale Texterkennung.
 
 ## Bank-CSV importieren und rückgängig machen
 

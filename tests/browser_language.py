@@ -75,9 +75,23 @@ def run():
                 page.locator('#rows tr').first.click()
                 assert page.locator('#merchant').input_value() == 'Ausgaben und Vermögen'
                 assert page.locator('#entryNotes').input_value() == 'Einstellungen bleiben unverändert'
+                from test_pdf_receipts import pdf_bytes
+                page.set_input_files('#photo', {'name':'synthetic-invoice.pdf','mimeType':'application/pdf','buffer':pdf_bytes()})
+                page.wait_for_function("() => !document.querySelector('#photo').disabled && !document.querySelector('#save').disabled")
+                assert not page.locator('#editError').inner_text()
+                page.click('#save')
+                page.wait_for_function("() => !document.querySelector('#editor').open")
+                page.locator('#rows tr').first.click()
+                assert page.locator('#receiptLink').is_visible()
+                image_response=page.request.get(origin+page.locator('#receiptLink').get_attribute('href'))
+                assert image_response.headers['content-type']=='image/jpeg'
+                import io
+                from PIL import Image
+                with Image.open(io.BytesIO(image_response.body())) as receipt:
+                    assert receipt.width==1600 and receipt.height>4000
                 assert not errors, errors
                 browser.close()
-                print('Browser checks passed: both languages, persistence, all main views, manuals, EUR entry creation, unchanged user data.')
+                print('Browser checks passed: both languages, persistence, all main views, manuals, EUR entry creation, unchanged user data, PDF upload/OCR/save/reopen.')
         finally:
             http.shutdown()
             ledger.DB = previous

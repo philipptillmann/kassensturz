@@ -30,3 +30,6 @@
 !requirements-encryption.txt
 
 !localization.py
+
+!tests/fixtures/
+!tests/fixtures/*.pdf
