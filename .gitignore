@@ -18,3 +18,7 @@ secrets/
 encrypted-data/
 
 .encrypted-deployment
+
+# Per-server proxy configuration, retained across updates.
+compose.server-local.yaml
+.external-proxy-deployment

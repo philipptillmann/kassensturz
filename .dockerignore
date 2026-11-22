@@ -33,3 +33,5 @@
 
 !tests/fixtures/
 !tests/fixtures/*.pdf
+
+!update.sh
